@@ -1,0 +1,6 @@
+[0m[[0m[0mdebug[0m] [0m[0mAcquiring lock on file /Users/alesniak/Documents/Master Thesis/stream-constraints/project/target/.sbt-compilation-infos/stream-constraints-compile/.sbt-idea-lock ...[0m
+[0m[[0m[31merror[0m] [0m[0m/Users/alesniak/Documents/Master Thesis/stream-constraints/src/main/scala/com/github/annterina/stream_constraints/ConstrainedKStream.scala:3:34: not found: type KStream[0m
+[0m[[0m[31merror[0m] [0m[0mclass ConstrainedKStream extends KStream {[0m
+[0m[[0m[31merror[0m] [0m[0m                                 ^[0m
+[0m[[0m[31merror[0m] [0m[0mone error found[0m
+[0m[[0m[0mdebug[0m] [0m[0mReleasing lock on file /Users/alesniak/Documents/Master Thesis/stream-constraints/project/target/.sbt-compilation-infos/stream-constraints-compile/.sbt-idea-lock.[0m

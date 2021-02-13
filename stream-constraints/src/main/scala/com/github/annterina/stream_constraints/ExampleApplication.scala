@@ -1,0 +1,42 @@
+package com.github.annterina.stream_constraints
+
+import java.time.Duration
+import java.util.Properties
+
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.common.serialization.Serdes
+import org.apache.kafka.streams.{KafkaStreams, StreamsConfig, Topology}
+import org.apache.kafka.streams.kstream.{Consumed, Produced}
+import org.slf4j.{Logger, LoggerFactory}
+
+object ExampleApplication {
+
+  private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
+
+  val kafkaStreamsConfig: Properties = {
+    val properties = new Properties()
+    properties.put(StreamsConfig.APPLICATION_ID_CONFIG, "example-application")
+    properties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "kafka.docker:9092")
+    properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest")
+    properties
+  }
+
+  val builder = new CStreamsBuilder()
+  builder
+    .stream("topic")(Consumed.`with`(Serdes.String, Serdes.String))
+    .constrain()
+    .to("output-topic")(Produced.`with`(Serdes.String, Serdes.String))
+
+  val topology: Topology = builder.build()
+
+  logger.info(topology.describe().toString)
+  val streams = new KafkaStreams(topology, kafkaStreamsConfig)
+
+  streams.cleanUp()
+  streams.start()
+
+  sys.ShutdownHookThread {
+    streams.close(Duration.ofSeconds(5))
+  }
+
+}
