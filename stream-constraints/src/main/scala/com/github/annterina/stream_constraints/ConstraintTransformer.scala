@@ -1,7 +1,7 @@
 package com.github.annterina.stream_constraints
 
 import org.apache.kafka.streams.KeyValue
-import org.apache.kafka.streams.kstream.{Transformer, TransformerSupplier}
+import org.apache.kafka.streams.kstream.Transformer
 import org.apache.kafka.streams.processor.ProcessorContext
 
 class ConstraintTransformer[K, V] extends Transformer[K, V, KeyValue[K, V]] {

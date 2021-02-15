@@ -1,12 +1,14 @@
-package com.github.annterina.stream_constraints
+package com.github.annterina.stream_constraints.example
 
 import java.time.Duration
 import java.util.Properties
 
+import com.github.annterina.stream_constraints.CStreamsBuilder
+import com.github.annterina.stream_constraints.constraints.{Constraint, ConstraintBuilder}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Serdes
-import org.apache.kafka.streams.{KafkaStreams, StreamsConfig, Topology}
 import org.apache.kafka.streams.kstream.{Consumed, Produced}
+import org.apache.kafka.streams.{KafkaStreams, StreamsConfig, Topology}
 import org.slf4j.{Logger, LoggerFactory}
 
 object ExampleApplication {
@@ -21,10 +23,17 @@ object ExampleApplication {
     properties
   }
 
+
+  val constraint: Constraint[String, String] = new ConstraintBuilder[String, String]
+    .atLeastOnce(value => value.split("_")(1) == "created") // TODO .withLink
+    .before(value => value.split("_")(1) == "updated") // TODO .withLink
+    .valueLink(v => v.split("_").head)
+    .build()
+
   val builder = new CStreamsBuilder()
   builder
     .stream("topic")(Consumed.`with`(Serdes.String, Serdes.String))
-    .constrain()
+    .constrain(constraint)
     .to("output-topic")(Produced.`with`(Serdes.String, Serdes.String))
 
   val topology: Topology = builder.build()
