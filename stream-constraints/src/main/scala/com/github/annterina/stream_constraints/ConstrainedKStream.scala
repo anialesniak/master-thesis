@@ -23,12 +23,12 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
     val checkKeyValueStore = Stores.keyValueStoreBuilder(
       checkStoreSupplier,
       constraint.linkSerde,
-      Serdes.serdeFrom(Boolean.getClass)) // TODO check this
+      Serdes.Short)
     builder.addStateStore(checkKeyValueStore)
 
     constraint match {
       case prerequisite: PrerequisiteConstraint[K, V, L] =>
-        new ConstrainedKStream(inner.transform(() => new PrerequisiteConstraintTransformer(prerequisite), storeName), builder)
+        new ConstrainedKStream(inner.transform(() => new PrerequisiteConstraintTransformer(prerequisite), storeName, checkStoreName), builder)
     }
   }
 

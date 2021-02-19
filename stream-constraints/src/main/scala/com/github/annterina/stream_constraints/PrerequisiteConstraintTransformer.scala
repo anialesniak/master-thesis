@@ -15,22 +15,22 @@ class PrerequisiteConstraintTransformer[K, V, L](constraint: PrerequisiteConstra
   }
 
   override def transform(key: K, value: V): KeyValue[K, V] = {
-    val checkStore = context.getStateStore[KeyValueStore[L, Boolean]](constraint.toString + "@PrerequisiteCheck")
+    val checkStore = context.getStateStore[KeyValueStore[L, Short]](constraint.toString + "@PrerequisiteCheck")
     val bufferStore = context.getStateStore[KeyValueStore[L, KeyValue[K, V]]](constraint.toString + "@BufferStore")
     val link = linkValue(key, value)
 
     if (constraint.atLeastOnce.apply(value)) {
-      checkStore.put(link, true)
+      checkStore.put(link, 1)
       context.forward(key, value)
 
-      val buffered: KeyValue[K, V] = bufferStore.get(link)
-      if (buffered != null) {
-        context.forward(buffered.key, buffered.value)
+      val buffered: Option[KeyValue[K, V]] = Option(bufferStore.get(link))
+      if (buffered.nonEmpty) {
+        context.forward(buffered.get.key, buffered.get.value)
         bufferStore.delete(link)
       }
     } else if (constraint.before.apply(value)) {
-      val prerequisiteSeen: Boolean = checkStore.get(link)
-      if (prerequisiteSeen) context.forward(key, value)
+      val prerequisiteSeen = Option(checkStore.get(link))
+      if (prerequisiteSeen.nonEmpty) context.forward(key, value)
       else {
         bufferStore.put(link, KeyValue.pair(key, value))
       }
