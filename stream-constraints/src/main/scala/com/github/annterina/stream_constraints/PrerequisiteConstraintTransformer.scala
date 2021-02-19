@@ -1,10 +1,11 @@
 package com.github.annterina.stream_constraints
 
+import com.github.annterina.stream_constraints.constraints.PrerequisiteConstraint
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.Transformer
 import org.apache.kafka.streams.processor.ProcessorContext
 
-class ConstraintTransformer[K, V] extends Transformer[K, V, KeyValue[K, V]] {
+class PrerequisiteConstraintTransformer[K, V](constraint: PrerequisiteConstraint[K, V]) extends Transformer[K, V, KeyValue[K, V]] {
 
   var context: ProcessorContext = _
 
@@ -13,6 +14,9 @@ class ConstraintTransformer[K, V] extends Transformer[K, V, KeyValue[K, V]] {
   }
 
   override def transform(readOnlyKey: K, value: V): KeyValue[K, V] = {
+
+
+
     new KeyValue[K, V](readOnlyKey, value)
   }
 

@@ -8,8 +8,8 @@ class CStreamsBuilder  {
 
   private val builder = new StreamsBuilder()
 
-  def stream[K, V](topic: String)(implicit consumed: Consumed[K, V]): CStreamsInput[K, V] = {
-    new CStreamsInput[K, V](builder.stream(topic))
+  def stream[K, V](topic: String)(implicit consumed: Consumed[K, V]): ConstrainedKStream[K, V] = {
+    new ConstrainedKStream[K, V](builder.stream(topic), builder)
   }
 
   def build(): Topology = {

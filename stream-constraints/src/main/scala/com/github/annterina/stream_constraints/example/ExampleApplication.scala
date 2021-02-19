@@ -27,12 +27,14 @@ object ExampleApplication {
   val constraint: Constraint[String, String] = new ConstraintBuilder[String, String]
     .atLeastOnce(value => value.split("_")(1) == "created") // TODO .withLink
     .before(value => value.split("_")(1) == "updated") // TODO .withLink
-    .valueLink(v => v.split("_").head)
-    .build()
+    .valueLink(v => v.split("_").head)(Serdes.String)
+    .build(Serdes.String, Serdes.String)
 
   val builder = new CStreamsBuilder()
+
   builder
     .stream("topic")(Consumed.`with`(Serdes.String, Serdes.String))
+    .filter((k, _) => !k.startsWith("a"))
     .constrain(constraint)
     .to("output-topic")(Produced.`with`(Serdes.String, Serdes.String))
 
