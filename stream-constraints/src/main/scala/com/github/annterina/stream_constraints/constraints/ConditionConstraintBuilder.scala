@@ -2,14 +2,14 @@ package com.github.annterina.stream_constraints.constraints
 
 import org.apache.kafka.common.serialization.Serde
 
-class ConditionConstraintBuilder[K, V](constraint: Constraint[K, V]) {
+class ConditionConstraintBuilder[K, V, L](constraint: Constraint[K, V, L]) {
 
-  def keyLink(f: K => Any)(implicit serde: Serde[_ >: Any]): ConditionConstraintBuilder[K, V] = {
-    new ConditionConstraintBuilder[K, V](constraint.withKeyLink(f, serde))
+  def keyLink(f: K => L)(implicit serde: Serde[L]): ConditionConstraintBuilder[K, V, L] = {
+    new ConditionConstraintBuilder[K, V, L](constraint.withKeyLink(f, serde))
   }
 
-  def valueLink(f: V => Any)(implicit serde: Serde[_ >: Any]): ConditionConstraintBuilder[K, V] = {
-    new ConditionConstraintBuilder[K, V](constraint.withValueLink(f, serde))
+  def valueLink(f: V => L)(implicit serde: Serde[L]): ConditionConstraintBuilder[K, V, L] = {
+    new ConditionConstraintBuilder[K, V, L](constraint.withValueLink(f, serde))
   }
 
   // TODO additional filtering
@@ -17,7 +17,7 @@ class ConditionConstraintBuilder[K, V](constraint: Constraint[K, V]) {
 
   def whereValue(f: V => Any) = {}
 
-  def build(keySerde: Serde[K], valueSerde: Serde[V]): Constraint[K, V] = {
+  def build(keySerde: Serde[K], valueSerde: Serde[V]): Constraint[K, V, L] = {
     constraint.withKeySerde(keySerde).withValueSerde(valueSerde)
   }
 

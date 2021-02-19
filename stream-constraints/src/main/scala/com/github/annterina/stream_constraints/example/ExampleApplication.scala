@@ -24,7 +24,7 @@ object ExampleApplication {
   }
 
 
-  val constraint: Constraint[String, String] = new ConstraintBuilder[String, String]
+  val constraint: Constraint[String, String, String] = new ConstraintBuilder[String, String, String]
     .atLeastOnce(value => value.split("_")(1) == "created") // TODO .withLink
     .before(value => value.split("_")(1) == "updated") // TODO .withLink
     .valueLink(v => v.split("_").head)(Serdes.String)
