@@ -41,7 +41,7 @@ class PrerequisiteConstraintTransformer[K, V, L](constraint: PrerequisiteConstra
     null
   }
 
-  override def close(): Unit = ???
+  override def close(): Unit = {}
 
   private def linkValue(key: K, value: V): L = {
     constraint.link match {

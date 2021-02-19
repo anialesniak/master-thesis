@@ -18,7 +18,6 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
       new KeyValueSerde[K, V](constraint.keySerde, constraint.valueSerde))
     builder.addStateStore(keyValueStore)
 
-
     val checkStoreName = constraint.toString + "@PrerequisiteCheck" //TODO better name
     val checkStoreSupplier = Stores.persistentKeyValueStore(checkStoreName)
     val checkKeyValueStore = Stores.keyValueStoreBuilder(
@@ -26,7 +25,6 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
       constraint.linkSerde,
       Serdes.serdeFrom(Boolean.getClass)) // TODO check this
     builder.addStateStore(checkKeyValueStore)
-
 
     constraint match {
       case prerequisite: PrerequisiteConstraint[K, V, L] =>
