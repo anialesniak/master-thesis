@@ -5,8 +5,11 @@ import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.Transformer
 import org.apache.kafka.streams.processor.ProcessorContext
 import org.apache.kafka.streams.state.KeyValueStore
+import org.slf4j.{Logger, LoggerFactory}
 
 class PrerequisiteConstraintTransformer[K, V, L](constraint: PrerequisiteConstraint[K, V, L]) extends Transformer[K, V, KeyValue[K, V]] {
+
+  private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   var context: ProcessorContext = _
 
@@ -21,16 +24,21 @@ class PrerequisiteConstraintTransformer[K, V, L](constraint: PrerequisiteConstra
 
     if (constraint.atLeastOnce.apply(value)) {
       checkStore.put(link, 1)
+      logger.info(s"1 PUBLISH: ${key} in ${constraint}")
       context.forward(key, value)
 
       val buffered: Option[KeyValue[K, V]] = Option(bufferStore.get(link))
       if (buffered.nonEmpty) {
+        logger.info(s"2 PUBLISH: ${buffered.get.key} in ${constraint}")
         context.forward(buffered.get.key, buffered.get.value)
         bufferStore.delete(link)
       }
     } else if (constraint.before.apply(value)) {
       val prerequisiteSeen = Option(checkStore.get(link))
-      if (prerequisiteSeen.nonEmpty) context.forward(key, value)
+      if (prerequisiteSeen.nonEmpty) {
+        logger.info(s"3 PUBLISH: ${key} in ${constraint}")
+        context.forward(key, value)
+      }
       else {
         bufferStore.put(link, KeyValue.pair(key, value))
       }
