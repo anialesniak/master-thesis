@@ -24,19 +24,16 @@ class PrerequisiteConstraintTransformer[K, V, L](constraint: PrerequisiteConstra
 
     if (constraint.atLeastOnce.apply(value)) {
       checkStore.put(link, 1)
-      logger.info(s"1 PUBLISH: ${key} in ${constraint}")
       context.forward(key, value)
 
       val buffered: Option[KeyValue[K, V]] = Option(bufferStore.get(link))
       if (buffered.nonEmpty) {
-        logger.info(s"2 PUBLISH: ${buffered.get.key} in ${constraint}")
         context.forward(buffered.get.key, buffered.get.value)
         bufferStore.delete(link)
       }
     } else if (constraint.before.apply(value)) {
       val prerequisiteSeen = Option(checkStore.get(link))
       if (prerequisiteSeen.nonEmpty) {
-        logger.info(s"3 PUBLISH: ${key} in ${constraint}")
         context.forward(key, value)
       }
       else {
