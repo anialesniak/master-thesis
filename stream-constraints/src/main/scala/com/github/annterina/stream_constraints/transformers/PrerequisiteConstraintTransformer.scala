@@ -1,4 +1,4 @@
-package com.github.annterina.stream_constraints
+package com.github.annterina.stream_constraints.transformers
 
 import com.github.annterina.stream_constraints.constraints.PrerequisiteConstraint
 import org.apache.kafka.streams.KeyValue
@@ -20,26 +20,30 @@ class PrerequisiteConstraintTransformer[K, V, L](constraint: PrerequisiteConstra
   override def transform(key: K, value: V): KeyValue[K, V] = {
     val checkStore = context.getStateStore[KeyValueStore[L, Short]](constraint.toString + "@PrerequisiteCheck")
     val bufferStore = context.getStateStore[KeyValueStore[L, KeyValue[K, V]]](constraint.toString + "@BufferStore")
-    val link = linkValue(key, value)
+    val link = constraint.link.apply(key, value)
 
     if (constraint.atLeastOnce.apply(value)) {
       checkStore.put(link, 1)
+      logger.info(s"FORWARDING: ${key}")
       context.forward(key, value)
 
       val buffered: Option[KeyValue[K, V]] = Option(bufferStore.get(link))
       if (buffered.nonEmpty) {
+        logger.info(s"FORWARDING: ${buffered.get.key}")
         context.forward(buffered.get.key, buffered.get.value)
         bufferStore.delete(link)
       }
     } else if (constraint.before.apply(value)) {
       val prerequisiteSeen = Option(checkStore.get(link))
       if (prerequisiteSeen.nonEmpty) {
+        logger.info(s"FORWARDING: ${key}")
         context.forward(key, value)
       }
       else {
         bufferStore.put(link, KeyValue.pair(key, value))
       }
     } else {
+      logger.info(s"FORWARDING: ${key}")
       context.forward(key, value)
     }
 
@@ -47,11 +51,4 @@ class PrerequisiteConstraintTransformer[K, V, L](constraint: PrerequisiteConstra
   }
 
   override def close(): Unit = {}
-
-  private def linkValue(key: K, value: V): L = {
-    constraint.link match {
-      case Left(link)  => link.apply(key)
-      case Right(link) => link.apply(value)
-    }
-  }
 }

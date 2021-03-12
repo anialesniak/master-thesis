@@ -24,21 +24,18 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
     val orderEventSerde = Serdes.serdeFrom(OrderEventSerde.serializer(), OrderEventSerde.deserializer())
 
     val constraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .atLeastOnce(e => e.action == "CREATED")
-      .before(e => e.action == "UPDATED")
-      .valueLink(e => e.key)(Serdes.Integer)
+      .prerequisite(e => e.action == "CREATED", e => e.action == "UPDATED")
+      .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
     val deleteConstraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .atLeastOnce(e => e.action == "CREATED")
-      .before(e => e.action == "DELETED")
-      .valueLink(e => e.key)(Serdes.Integer)
+      .prerequisite(e => e.action == "CREATED", e => e.action == "DELETED")
+      .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
     val updateDeleteConstraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .atLeastOnce(e => e.action == "UPDATED")
-      .before(e => e.action == "DELETED")
-      .valueLink(e => e.key)(Serdes.Integer)
+      .prerequisite(e => e.action == "UPDATED", e => e.action == "DELETED")
+      .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
     val builder = new CStreamsBuilder()
@@ -47,7 +44,8 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
       .stream("orders")(Consumed.`with`(Serdes.String, orderEventSerde))
       .constrain(constraint)
       .constrain(deleteConstraint)
-      //.constrain(updateDeleteConstraint)
+      .constrain(updateDeleteConstraint)
+
       .to("orders-output-topic")(Produced.`with`(Serdes.String, orderEventSerde))
 
     testDriver = new TopologyTestDriver(builder.build(), config)
@@ -101,8 +99,8 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
     }
 
     it("should publish both events after receiving the prerequisite") {
-      inputTopic.pipeInput("123", OrderEvent(1, "DELETED"))
-      inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"))
+      inputTopic.pipeInput("123", OrderEvent(1, "UPDATED"))
+      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"))
       inputTopic.pipeInput("789", OrderEvent(1, "CREATED"))
 
       val firstOutput = outputTopic.readKeyValue()
@@ -113,13 +111,13 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
 
       val secondOutput = outputTopic.readKeyValue()
 
-      assert(secondOutput.key == "456")
+      assert(secondOutput.key == "123")
       assert(secondOutput.value.key == 1)
       assert(secondOutput.value.action == "UPDATED")
 
       val thirdOutput = outputTopic.readKeyValue()
 
-      assert(thirdOutput.key == "123")
+      assert(thirdOutput.key == "456")
       assert(thirdOutput.value.key == 1)
       assert(thirdOutput.value.action == "DELETED")
     }

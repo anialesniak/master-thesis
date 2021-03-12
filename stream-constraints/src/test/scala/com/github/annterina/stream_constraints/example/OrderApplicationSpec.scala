@@ -24,9 +24,8 @@ class OrderApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
     val orderEventSerde = Serdes.serdeFrom(OrderEventSerde.serializer(), OrderEventSerde.deserializer())
 
     val constraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .atLeastOnce(e => e.action == "CREATED")
-      .before(e => e.action == "UPDATED")
-      .valueLink(e => e.key)(Serdes.Integer)
+      .prerequisite(e => e.action == "CREATED", e => e.action == "UPDATED")
+      .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
     val builder = new CStreamsBuilder()

@@ -2,8 +2,10 @@ package com.github.annterina.stream_constraints.constraints
 
 class ConstraintBuilder[K, V, L] {
 
-  def atLeastOnce(f: V => Boolean): PrerequisiteConstraintBuilder[K, V, L] = {
-     new PrerequisiteConstraintBuilder[K, V, L](f)
+  //TODO here too
+  def prerequisite(atLeastOnce: V => Boolean, before: V => Boolean): ConditionConstraintBuilder[K, V, L] = {
+    val constraint = new PrerequisiteConstraint[K, V, L](atLeastOnce, before)
+    new ConditionConstraintBuilder[K, V, L](constraint)
   }
 
 }
