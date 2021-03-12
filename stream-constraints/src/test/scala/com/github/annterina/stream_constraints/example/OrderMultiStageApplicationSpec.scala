@@ -24,17 +24,17 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
     val orderEventSerde = Serdes.serdeFrom(OrderEventSerde.serializer(), OrderEventSerde.deserializer())
 
     val constraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .prerequisite(e => e.action == "CREATED", e => e.action == "UPDATED")
+      .prerequisite((_, e) => e.action == "CREATED", (_, e) => e.action == "UPDATED")
       .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
     val deleteConstraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .prerequisite(e => e.action == "CREATED", e => e.action == "DELETED")
+      .prerequisite((_, e) => e.action == "CREATED", (_, e) => e.action == "DELETED")
       .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
     val updateDeleteConstraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .prerequisite(e => e.action == "UPDATED", e => e.action == "DELETED")
+      .prerequisite((_, e) => e.action == "UPDATED", (_, e) => e.action == "DELETED")
       .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 

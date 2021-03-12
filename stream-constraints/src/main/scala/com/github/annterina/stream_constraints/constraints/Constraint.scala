@@ -27,10 +27,10 @@ trait Constraint[K, V, L] {
   }
 }
 
-case class PrerequisiteConstraint[K, V, L](atLeastOnce: V => Boolean, before: V => Boolean) extends Constraint[K, V, L] {
+case class PrerequisiteConstraint[K, V, L](atLeastOnce: (K, V) => Boolean, before: (K, V) => Boolean) extends Constraint[K, V, L] {
 
 }
 
-case class MultiPrerequisiteConstraint[K, V, L](constraints : Set[(V => Boolean, V => Boolean)]) extends Constraint[K, V, L] {
+case class MultiPrerequisiteConstraint[K, V, L](constraints : Set[((K, V) => Boolean, (K, V) => Boolean)]) extends Constraint[K, V, L] {
 
 }

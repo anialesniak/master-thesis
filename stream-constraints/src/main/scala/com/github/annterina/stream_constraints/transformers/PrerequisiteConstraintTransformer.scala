@@ -22,7 +22,7 @@ class PrerequisiteConstraintTransformer[K, V, L](constraint: PrerequisiteConstra
     val bufferStore = context.getStateStore[KeyValueStore[L, KeyValue[K, V]]](constraint.toString + "@BufferStore")
     val link = constraint.link.apply(key, value)
 
-    if (constraint.atLeastOnce.apply(value)) {
+    if (constraint.atLeastOnce.apply(key, value)) {
       checkStore.put(link, 1)
       logger.info(s"FORWARDING: ${key}")
       context.forward(key, value)
@@ -33,7 +33,7 @@ class PrerequisiteConstraintTransformer[K, V, L](constraint: PrerequisiteConstra
         context.forward(buffered.get.key, buffered.get.value)
         bufferStore.delete(link)
       }
-    } else if (constraint.before.apply(value)) {
+    } else if (constraint.before.apply(key, value)) {
       val prerequisiteSeen = Option(checkStore.get(link))
       if (prerequisiteSeen.nonEmpty) {
         logger.info(s"FORWARDING: ${key}")
