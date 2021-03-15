@@ -16,7 +16,9 @@ val kafkaStreamsDependencies = Seq(
 )
 
 libraryDependencies ++= kafkaStreamsDependencies ++ Seq(
-  "ch.qos.logback"               %  "logback-classic"                 %   "1.2.3",
+  "ch.qos.logback"               %      "logback-classic"             %   "1.2.3",
   "org.scalatest"                %%     "scalatest"                   %   "3.2.2" % Test,
-  "com.fasterxml.jackson.module" %%     "jackson-module-scala"        %   "2.12.0"
+  "com.fasterxml.jackson.module" %%     "jackson-module-scala"        %   "2.12.0",
+  "org.scala-graph"              %%     "graph-core"                  %   "1.13.2",
+  "org.scala-graph"              %%     "graph-json"                  %   "1.13.0"
 )

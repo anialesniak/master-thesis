@@ -31,6 +31,11 @@ case class PrerequisiteConstraint[K, V, L](atLeastOnce: (K, V) => Boolean, befor
 
 }
 
-case class MultiPrerequisiteConstraint[K, V, L](constraints : Set[((K, V) => Boolean, (K, V) => Boolean)]) extends Constraint[K, V, L] {
+case class MultiPrerequisiteConstraint[K, V, L](constraints : Set[Prerequisite[K, V]],
+                                                names: Map[String, (K, V) => Boolean]) extends Constraint[K, V, L] {
+
+}
+
+case class Prerequisite[K, V](before: ((K, V) => Boolean, String), after: ((K, V) => Boolean, String)) {
 
 }

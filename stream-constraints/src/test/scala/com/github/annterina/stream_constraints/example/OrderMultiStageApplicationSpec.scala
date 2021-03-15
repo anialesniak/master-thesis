@@ -3,7 +3,7 @@ package com.github.annterina.stream_constraints.example
 import java.util.Properties
 
 import com.github.annterina.stream_constraints.CStreamsBuilder
-import com.github.annterina.stream_constraints.constraints.ConstraintBuilder
+import com.github.annterina.stream_constraints.constraints.{ConstraintBuilder, MultiConstraintBuilder}
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.kstream.{Consumed, Produced}
 import org.apache.kafka.streams.{StreamsConfig, TestInputTopic, TestOutputTopic, TopologyTestDriver}
@@ -40,12 +40,20 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
 
     val builder = new CStreamsBuilder()
 
+    val multiConstraint = new MultiConstraintBuilder[String, OrderEvent, Integer]
+      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
+        ((_, e) => e.action == "UPDATED", "Order Updated"))
+      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
+        ((_, e) => e.action == "DELETED", "Order Deleted"))
+      .link((_, e) => e.key)(Serdes.Integer)
+      .build(Serdes.String, orderEventSerde)
+
     builder
       .stream("orders")(Consumed.`with`(Serdes.String, orderEventSerde))
-      .constrain(constraint)
-      .constrain(deleteConstraint)
-      .constrain(updateDeleteConstraint)
-
+//      .constrain(constraint)
+//      .constrain(deleteConstraint)
+//      .constrain(updateDeleteConstraint)
+      .constrain(multiConstraint)
       .to("orders-output-topic")(Produced.`with`(Serdes.String, orderEventSerde))
 
     testDriver = new TopologyTestDriver(builder.build(), config)
@@ -96,6 +104,23 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
       assert(output.key == "123")
       assert(output.value.key == 2)
       assert(output.value.action == "CREATED")
+    }
+
+    it("should publish an event when the prerequisite is satisfied") {
+      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"))
+      inputTopic.pipeInput("123", OrderEvent(1, "CREATED"))
+
+      val output = outputTopic.readKeyValue()
+
+      assert(output.key == "123")
+      assert(output.value.key == 1)
+      assert(output.value.action == "CREATED")
+
+      val secondOutput = outputTopic.readKeyValue()
+
+      assert(secondOutput.key == "456")
+      assert(secondOutput.value.key == 1)
+      assert(secondOutput.value.action == "DELETED")
     }
 
     it("should publish both events after receiving the prerequisite") {
