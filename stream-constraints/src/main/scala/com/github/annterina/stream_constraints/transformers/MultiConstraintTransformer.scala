@@ -12,6 +12,8 @@ import scalax.collection.GraphEdge.DiEdge
 import scalax.collection.io.json.JsonGraph
 import scalax.collection.mutable.Graph
 
+import scala.collection.mutable
+
 class MultiConstraintTransformer[K, V, L](constraint: MultiPrerequisiteConstraint[K, V, L]) extends Transformer[K, V, KeyValue[K, V]] {
 
   private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -51,21 +53,24 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiPrerequisiteConstrain
       context.forward(key, value)
       constraintNode.get.value.seen = true
 
-
-      // get possible buffered (remember to set seen to true)
-      // TODO no no no - we need to traverse all graph starting from the constrainNode as there may be
-      //  this domino effect
+      // get possible buffered
       val nodeOrdering: graph.NodeOrdering = graph.NodeOrdering((node1, node2) => node1.incoming.size.compare(node2.incoming.size))
       val successors = graph.innerNodeTraverser(constraintNode.get).withOrdering(nodeOrdering)
 
+      var bufferedToPublish = Seq.empty[ValueAndTimestamp[KeyValue[K, V]]]
       successors.toList.tail.foreach(node => {
-        if (node.diPredecessors.forall(node => node.value.seen) && node.value.buffered) {
-          val buffered = bufferStore(node.value.name).get(link).value()
-          context.forward(buffered.key, buffered.value)
+        if (node.value.buffered && node.diPredecessors.forall(node => node.value.seen)) {
+          val buffered = bufferStore(node.value.name).get(link)
+          bufferedToPublish :+= buffered
           node.value.seen = true
           node.value.buffered = false
         }
       })
+
+      bufferedToPublish
+        .sortBy(_.timestamp())
+        .map(_.value())
+        .foreach(record => context.forward(record.key, record.value))
 
       graphStore.put(link, graph)
     } else {

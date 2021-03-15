@@ -1,5 +1,6 @@
 package com.github.annterina.stream_constraints.example
 
+import java.time.Instant
 import java.util.Properties
 
 import com.github.annterina.stream_constraints.CStreamsBuilder
@@ -124,9 +125,11 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
     }
 
     it("should publish both events after receiving the prerequisite") {
-      inputTopic.pipeInput("123", OrderEvent(1, "UPDATED"))
-      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"))
-      inputTopic.pipeInput("789", OrderEvent(1, "CREATED"))
+      val timestamp = Instant.parse("2021-03-15T10:15:00.00Z")
+
+      inputTopic.pipeInput("123", OrderEvent(1, "UPDATED"), timestamp)
+      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"), timestamp.plusSeconds(30))
+      inputTopic.pipeInput("789", OrderEvent(1, "CREATED"), timestamp.plusSeconds(60))
 
       val firstOutput = outputTopic.readKeyValue()
 
