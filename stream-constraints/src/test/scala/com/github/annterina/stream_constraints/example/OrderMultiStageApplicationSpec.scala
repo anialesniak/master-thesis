@@ -4,7 +4,7 @@ import java.time.Instant
 import java.util.Properties
 
 import com.github.annterina.stream_constraints.CStreamsBuilder
-import com.github.annterina.stream_constraints.constraints.{ConstraintBuilder, MultiConstraintBuilder}
+import com.github.annterina.stream_constraints.constraints.ConstraintBuilder
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.kstream.{Consumed, Produced}
 import org.apache.kafka.streams.{StreamsConfig, TestInputTopic, TestOutputTopic, TopologyTestDriver}
@@ -24,24 +24,9 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
 
     val orderEventSerde = Serdes.serdeFrom(OrderEventSerde.serializer(), OrderEventSerde.deserializer())
 
-    val constraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .prerequisite((_, e) => e.action == "CREATED", (_, e) => e.action == "UPDATED")
-      .link((_, e) => e.key)(Serdes.Integer)
-      .build(Serdes.String, orderEventSerde)
-
-    val deleteConstraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .prerequisite((_, e) => e.action == "CREATED", (_, e) => e.action == "DELETED")
-      .link((_, e) => e.key)(Serdes.Integer)
-      .build(Serdes.String, orderEventSerde)
-
-    val updateDeleteConstraint = new ConstraintBuilder[String, OrderEvent, Integer]
-      .prerequisite((_, e) => e.action == "UPDATED", (_, e) => e.action == "DELETED")
-      .link((_, e) => e.key)(Serdes.Integer)
-      .build(Serdes.String, orderEventSerde)
-
     val builder = new CStreamsBuilder()
 
-    val multiConstraint = new MultiConstraintBuilder[String, OrderEvent, Integer]
+    val constraints = new ConstraintBuilder[String, OrderEvent, Integer]
       .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
         ((_, e) => e.action == "UPDATED", "Order Updated"))
       .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
@@ -51,10 +36,7 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
 
     builder
       .stream("orders")(Consumed.`with`(Serdes.String, orderEventSerde))
-//      .constrain(constraint)
-//      .constrain(deleteConstraint)
-//      .constrain(updateDeleteConstraint)
-      .constrain(multiConstraint)
+      .constrain(constraints)
       .to("orders-output-topic")(Produced.`with`(Serdes.String, orderEventSerde))
 
     testDriver = new TopologyTestDriver(builder.build(), config)

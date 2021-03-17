@@ -1,12 +1,9 @@
 package com.github.annterina.stream_constraints
 
-import java.lang
-
-import com.github.annterina.stream_constraints.constraints.{Constraint, MultiPrerequisiteConstraint, PrerequisiteConstraint}
+import com.github.annterina.stream_constraints.constraints.{Constraint, MultiPrerequisiteConstraint}
 import com.github.annterina.stream_constraints.serdes.{GraphSerde, KeyValueSerde}
 import com.github.annterina.stream_constraints.transformers.graphs.ConstraintNode
-import com.github.annterina.stream_constraints.transformers.{MultiConstraintTransformer, PrerequisiteConstraintTransformer}
-import org.apache.kafka.common.serialization.Serdes
+import com.github.annterina.stream_constraints.transformers.MultiConstraintTransformer
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.scala.StreamsBuilder
 import org.apache.kafka.streams.scala.kstream.{KStream, Produced}
@@ -20,21 +17,6 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
 
   def constrain(constraint: Constraint[K, V, L]): ConstrainedKStream[K, V, L] = {
     constraint match {
-      case prerequisite: PrerequisiteConstraint[K, V, L] => {
-
-        val keyValueBufferStore = bufferStore(constraint)
-        builder.addStateStore(keyValueBufferStore)
-
-        val checkKeyValueStore = checkStore(constraint)
-        builder.addStateStore(checkKeyValueStore)
-
-        new ConstrainedKStream(inner.transform(() =>
-          new PrerequisiteConstraintTransformer(prerequisite),
-          keyValueBufferStore.name(),
-          checkKeyValueStore.name()),
-          builder)
-      }
-
       case multiConstraint: MultiPrerequisiteConstraint[K, V, L] => {
         val graphs = graphStore(multiConstraint)
         builder.addStateStore(graphs)
@@ -72,21 +54,6 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
   def to(topic: String)(implicit produced: Produced[K, V]): Unit =
     inner.to(topic)(produced)
 
-
-  private def bufferStore(constraint: Constraint[K, V, L]): StoreBuilder[KeyValueStore[L, KeyValue[K, V]]] = {
-    val storeName = constraint.toString + "@BufferStore" //TODO better name
-    val storeSupplier = Stores.persistentKeyValueStore(storeName)
-    Stores.keyValueStoreBuilder(
-      storeSupplier,
-      constraint.linkSerde,
-      new KeyValueSerde[K, V](constraint.keySerde, constraint.valueSerde))
-  }
-
-  private def checkStore(constraint: Constraint[K, V, L]): StoreBuilder[KeyValueStore[L, lang.Short]] = {
-    val checkStoreName = constraint.toString + "@PrerequisiteCheck" //TODO better name
-    val checkStoreSupplier = Stores.persistentKeyValueStore(checkStoreName)
-    Stores.keyValueStoreBuilder(checkStoreSupplier, constraint.linkSerde, Serdes.Short)
-  }
 
   private def graphStore(constraint: Constraint[K, V, L]): StoreBuilder[KeyValueStore[L, Graph[ConstraintNode, DiEdge]]] = {
     val graphStoreName = "Graph"

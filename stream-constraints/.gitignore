@@ -18,3 +18,7 @@ project/plugins/project/
 ### Scala ###
 *.class
 *.log
+
+
+### Graph files ###
+/graphs/*

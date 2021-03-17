@@ -20,5 +20,7 @@ libraryDependencies ++= kafkaStreamsDependencies ++ Seq(
   "org.scalatest"                %%     "scalatest"                   %   "3.2.2" % Test,
   "com.fasterxml.jackson.module" %%     "jackson-module-scala"        %   "2.12.0",
   "org.scala-graph"              %%     "graph-core"                  %   "1.13.2",
-  "org.scala-graph"              %%     "graph-json"                  %   "1.13.0"
+  "org.scala-graph"              %%     "graph-json"                  %   "1.13.0",
+  "org.scala-graph"              %%     "graph-dot"                   %   "1.13.0",
+  "guru.nidi"                    %      "graphviz-java"               %   "0.18.1"
 )

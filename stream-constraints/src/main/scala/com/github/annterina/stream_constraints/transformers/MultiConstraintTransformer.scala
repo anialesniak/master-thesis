@@ -1,18 +1,23 @@
 package com.github.annterina.stream_constraints.transformers
 
+import java.io.File
+
 import com.github.annterina.stream_constraints.constraints.MultiPrerequisiteConstraint
 import com.github.annterina.stream_constraints.serdes.GraphSerde
 import com.github.annterina.stream_constraints.transformers.graphs.ConstraintNode
+import guru.nidi.graphviz.engine.{Format, Graphviz}
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.Transformer
 import org.apache.kafka.streams.processor.ProcessorContext
 import org.apache.kafka.streams.state.{KeyValueStore, TimestampedKeyValueStore, ValueAndTimestamp}
 import org.slf4j.{Logger, LoggerFactory}
 import scalax.collection.GraphEdge.DiEdge
+import scalax.collection.io.dot.{DotEdgeStmt, DotGraph, DotRootGraph, Id, NodeId, graph2DotExport}
 import scalax.collection.io.json.JsonGraph
 import scalax.collection.mutable.Graph
+import scalax.collection.{Graph => ImGraph}
 
-import scala.collection.mutable
+import scala.tools.nsc
 
 class MultiConstraintTransformer[K, V, L](constraint: MultiPrerequisiteConstraint[K, V, L]) extends Transformer[K, V, KeyValue[K, V]] {
 
@@ -30,7 +35,9 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiPrerequisiteConstrain
       this.graph.addEdge(before, after)(DiEdge)
     })
 
-    // TODO check if it is acyclic
+    require(this.graph.isAcyclic, "The constraints cannot be mutually exclusive")
+
+    visualizeGraph("graph")
   }
 
   override def transform(key: K, value: V): KeyValue[K, V] = {
@@ -82,8 +89,6 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiPrerequisiteConstrain
       graphStore.put(link, graph)
     }
 
-    logger.info(graph.toJson(GraphSerde.descriptor))
-
     null
   }
 
@@ -91,6 +96,20 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiPrerequisiteConstrain
 
   private def bufferStore(name: String): TimestampedKeyValueStore[L, KeyValue[K, V]] = {
     context.getStateStore[TimestampedKeyValueStore[L, KeyValue[K, V]]](name)
+  }
+
+  private def visualizeGraph(name: String): File = {
+    val dotRoot = DotRootGraph(directed = true, id = Some(Id("Constraints")))
+    def edgeTransformer(innerEdge: ImGraph[ConstraintNode, DiEdge]#EdgeT): Option[(DotGraph, DotEdgeStmt)] = {
+      val edge = innerEdge.edge
+      Some(dotRoot,
+        DotEdgeStmt(NodeId(edge.from.value.name), NodeId(edge.to.value.name), Nil))
+    }
+
+    Graphviz.fromString(this.graph.toDot(dotRoot, edgeTransformer))
+      .scale(2)
+      .render(Format.PNG)
+      .toFile(new File(s"graphs/$name.png"))
   }
 
 }
