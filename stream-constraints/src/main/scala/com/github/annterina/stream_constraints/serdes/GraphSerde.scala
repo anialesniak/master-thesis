@@ -20,8 +20,7 @@ object GraphSerde extends Serde[Graph[ConstraintNode, DiEdge]] {
       Graph.fromJson(new String(data), descriptor)
     }
 
-  // TODO private
-  def descriptor: Descriptor[ConstraintNode] = {
+  private def descriptor: Descriptor[ConstraintNode] = {
     val nodeDescriptor = new NodeDescriptor[ConstraintNode](typeId = "Nodes")  {
       def id(node: Any): String = node match {
         case ConstraintNode(name, _, _) => name

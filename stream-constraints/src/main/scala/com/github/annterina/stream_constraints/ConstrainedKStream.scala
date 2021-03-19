@@ -1,13 +1,13 @@
 package com.github.annterina.stream_constraints
 
 import com.github.annterina.stream_constraints.constraints.{Constraint, MultiPrerequisiteConstraint}
-import com.github.annterina.stream_constraints.serdes.{GraphSerde, KeyValueSerde}
+import com.github.annterina.stream_constraints.serdes.{GraphSerde, KeyValueListSerde, KeyValueSerde}
 import com.github.annterina.stream_constraints.transformers.graphs.ConstraintNode
 import com.github.annterina.stream_constraints.transformers.MultiConstraintTransformer
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.scala.StreamsBuilder
 import org.apache.kafka.streams.scala.kstream.{KStream, Produced}
-import org.apache.kafka.streams.state.{KeyValueStore, StoreBuilder, Stores, TimestampedKeyValueStore}
+import org.apache.kafka.streams.state.{KeyValueStore, StoreBuilder, Stores, ValueAndTimestamp}
 import scalax.collection.GraphEdge.DiEdge
 import scalax.collection.mutable.Graph
 
@@ -26,13 +26,13 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
             val beforeName = prerequisite.before._2
             if (!names.contains(beforeName)) {
               names.add(beforeName)
-              builder.addStateStore(timestampedBufferStore(multiConstraint, beforeName))
+              builder.addStateStore(bufferStore(multiConstraint, beforeName))
             }
 
             val afterName = prerequisite.after._2
             if (!names.contains(afterName)) {
               names.add(afterName)
-              builder.addStateStore(timestampedBufferStore(multiConstraint, afterName))
+              builder.addStateStore(bufferStore(multiConstraint, afterName))
             }
             names
           })
@@ -61,11 +61,9 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
     Stores.keyValueStoreBuilder(graphStoreSupplier, constraint.linkSerde, GraphSerde)
   }
 
-  private def timestampedBufferStore(constraint: Constraint[K, V, L], name: String): StoreBuilder[TimestampedKeyValueStore[L, KeyValue[K, V]]] = {
-    val storeSupplier = Stores.persistentTimestampedKeyValueStore(name)
-    Stores.timestampedKeyValueStoreBuilder(
-      storeSupplier,
-      constraint.linkSerde,
-      new KeyValueSerde[K, V](constraint.keySerde, constraint.valueSerde))
+  private def bufferStore(constraint: Constraint[K, V, L], name: String): StoreBuilder[KeyValueStore[L, List[ValueAndTimestamp[KeyValue[K, V]]]]] = {
+    val storeSupplier = Stores.persistentKeyValueStore(name)
+    val keyValueSerde = new KeyValueSerde[K, V](constraint.keySerde, constraint.valueSerde)
+    Stores.keyValueStoreBuilder(storeSupplier, constraint.linkSerde, new KeyValueListSerde[K, V](keyValueSerde))
   }
 }

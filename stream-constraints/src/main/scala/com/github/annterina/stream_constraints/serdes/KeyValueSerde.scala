@@ -35,4 +35,5 @@ class KeyValueSerde[K, V](val keySerde: Serde[K], val valueSerde: Serde[V]) exte
       valueSerde.deserializer().deserialize(null, valueBytes)
     )
   }
+
 }

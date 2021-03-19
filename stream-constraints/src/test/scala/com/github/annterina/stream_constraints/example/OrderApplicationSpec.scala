@@ -142,6 +142,30 @@ class OrderApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
       assert(thirdOutput.value.key == 1)
       assert(thirdOutput.value.action == "UPDATED")
     }
+
+    it("should publish prerequisite event and multiple buffered events") {
+      inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"))
+      inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"))
+      inputTopic.pipeInput("123", OrderEvent(1, "CREATED"))
+
+      val firstOutput = outputTopic.readKeyValue()
+
+      assert(firstOutput.key == "123")
+      assert(firstOutput.value.key == 1)
+      assert(firstOutput.value.action == "CREATED")
+
+      val secondOutput = outputTopic.readKeyValue()
+
+      assert(secondOutput.key == "456")
+      assert(secondOutput.value.key == 1)
+      assert(secondOutput.value.action == "UPDATED")
+
+      val thirdOutput = outputTopic.readKeyValue()
+
+      assert(thirdOutput.key == "789")
+      assert(thirdOutput.value.key == 1)
+      assert(thirdOutput.value.action == "UPDATED")
+    }
   }
 
 }
