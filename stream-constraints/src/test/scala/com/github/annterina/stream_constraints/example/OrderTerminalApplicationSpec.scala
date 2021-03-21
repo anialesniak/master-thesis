@@ -11,11 +11,12 @@ import org.apache.kafka.streams.{StreamsConfig, TestInputTopic, TestOutputTopic,
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.funspec.AnyFunSpec
 
-class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
+class OrderTerminalApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
 
   private var testDriver: TopologyTestDriver = _
   private var inputTopic: TestInputTopic[String, OrderEvent] = _
   private var outputTopic: TestOutputTopic[String, OrderEvent] = _
+  private var redirectTopic: TestOutputTopic[String, OrderEvent] = _
 
   override def beforeEach(): Unit = {
     val config = new Properties()
@@ -24,15 +25,14 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
 
     val orderEventSerde = Serdes.serdeFrom(OrderEventSerde.serializer(), OrderEventSerde.deserializer())
 
-    val builder = new CStreamsBuilder()
-
     val constraints = new ConstraintBuilder[String, OrderEvent, Integer]
-      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
-        ((_, e) => e.action == "UPDATED", "Order Updated"))
-      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
-        ((_, e) => e.action == "DELETED", "Order Deleted"))
+      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"), ((_, e) => e.action == "DELETED", "Order Deleted"))
+      .terminal(((_, order) => order.action == "DELETED", "Order Deleted"))
+      .redirect("orders-redirect-topic")
       .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
+
+    val builder = new CStreamsBuilder()
 
     builder
       .stream("orders")(Consumed.`with`(Serdes.String, orderEventSerde))
@@ -52,6 +52,12 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
       Serdes.String.deserializer(),
       OrderEventSerde.deserializer()
     )
+
+    redirectTopic = testDriver.createOutputTopic(
+      "orders-redirect-topic",
+      Serdes.String.deserializer(),
+      OrderEventSerde.deserializer()
+    )
   }
 
   override def afterEach(): Unit = {
@@ -59,7 +65,7 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
     testDriver.close()
   }
 
-  describe("Order Application") {
+  describe("Order Terminal Application") {
 
     it("should emit the prerequisite event") {
       inputTopic.pipeInput("123", OrderEvent(1, "CREATED"))
@@ -71,33 +77,15 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
       assert(output.value.action == "CREATED")
     }
 
-    it("should buffer an event when the prerequisite was not processed") {
-      inputTopic.pipeInput("123", OrderEvent(1, "UPDATED"))
-      inputTopic.pipeInput("123", OrderEvent(1, "DELETED"))
-
-      assert(outputTopic.isEmpty)
-    }
-
-    it("should buffer an event when the prerequisite was not processed and publish not related event") {
-      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"))
-      inputTopic.pipeInput("123", OrderEvent(2, "CREATED"))
-
-      val output = outputTopic.readKeyValue()
-
-      assert(output.key == "123")
-      assert(output.value.key == 2)
-      assert(output.value.action == "CREATED")
-    }
-
-    it("should publish an event when the prerequisite is satisfied") {
-      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"))
+    it("should publish prerequisite event and terminal event") {
       inputTopic.pipeInput("123", OrderEvent(1, "CREATED"))
+      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"))
 
-      val output = outputTopic.readKeyValue()
+      val firstOutput = outputTopic.readKeyValue()
 
-      assert(output.key == "123")
-      assert(output.value.key == 1)
-      assert(output.value.action == "CREATED")
+      assert(firstOutput.key == "123")
+      assert(firstOutput.value.key == 1)
+      assert(firstOutput.value.action == "CREATED")
 
       val secondOutput = outputTopic.readKeyValue()
 
@@ -106,31 +94,60 @@ class OrderMultiStageApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
       assert(secondOutput.value.action == "DELETED")
     }
 
-    it("should publish both events after receiving the prerequisite") {
-      val timestamp = Instant.parse("2021-03-15T10:15:00.00Z")
-
-      inputTopic.pipeInput("123", OrderEvent(1, "UPDATED"), timestamp)
-      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"), timestamp.plusSeconds(30))
-      inputTopic.pipeInput("789", OrderEvent(1, "CREATED"), timestamp.plusSeconds(60))
+    it("should redirect event after terminal event") {
+      inputTopic.pipeInput("123", OrderEvent(1, "CREATED"))
+      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"))
+      inputTopic.pipeInput("789", OrderEvent(1, "DELETED"))
 
       val firstOutput = outputTopic.readKeyValue()
 
-      assert(firstOutput.key == "789")
+      assert(firstOutput.key == "123")
       assert(firstOutput.value.key == 1)
       assert(firstOutput.value.action == "CREATED")
 
       val secondOutput = outputTopic.readKeyValue()
 
-      assert(secondOutput.key == "123")
+      assert(secondOutput.key == "456")
       assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "UPDATED")
+      assert(secondOutput.value.action == "DELETED")
 
-      val thirdOutput = outputTopic.readKeyValue()
+      assert(outputTopic.isEmpty)
 
-      assert(thirdOutput.key == "456")
-      assert(thirdOutput.value.key == 1)
-      assert(thirdOutput.value.action == "DELETED")
+      val redirectOutput = redirectTopic.readKeyValue()
+
+      assert(redirectOutput.key == "789")
+      assert(redirectOutput.value.key == 1)
+      assert(redirectOutput.value.action == "DELETED")
     }
+
+    it("should redirect buffered terminal event") {
+      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
+
+      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"), timestamp)
+      inputTopic.pipeInput("789", OrderEvent(1, "DELETED"), timestamp.plusSeconds(30))
+      inputTopic.pipeInput("123", OrderEvent(1, "CREATED"), timestamp.plusSeconds(60))
+
+      val firstOutput = outputTopic.readKeyValue()
+
+      assert(firstOutput.key == "123")
+      assert(firstOutput.value.key == 1)
+      assert(firstOutput.value.action == "CREATED")
+
+      val secondOutput = outputTopic.readKeyValue()
+
+      assert(secondOutput.key == "456")
+      assert(secondOutput.value.key == 1)
+      assert(secondOutput.value.action == "DELETED")
+
+      assert(outputTopic.isEmpty)
+
+      val redirectOutput = redirectTopic.readKeyValue()
+
+      assert(redirectOutput.key == "789")
+      assert(redirectOutput.value.key == 1)
+      assert(redirectOutput.value.action == "DELETED")
+    }
+
   }
 
 }

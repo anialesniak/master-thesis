@@ -2,12 +2,12 @@ package com.github.annterina.stream_constraints.transformers
 
 import java.io.File
 
-import com.github.annterina.stream_constraints.constraints.MultiPrerequisiteConstraint
-import com.github.annterina.stream_constraints.transformers.graphs.ConstraintNode
+import com.github.annterina.stream_constraints.constraints.MultiConstraint
+import com.github.annterina.stream_constraints.transformers.graphs.{ConstraintNode, NodeTypes}
 import guru.nidi.graphviz.engine.{Format, Graphviz}
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.Transformer
-import org.apache.kafka.streams.processor.ProcessorContext
+import org.apache.kafka.streams.processor.{ProcessorContext, To}
 import org.apache.kafka.streams.state.{KeyValueStore, ValueAndTimestamp}
 import org.slf4j.{Logger, LoggerFactory}
 import scalax.collection.GraphEdge.DiEdge
@@ -18,56 +18,61 @@ import scalax.collection.{Graph => ImGraph}
 import scala.collection.mutable.ListBuffer
 
 
-class MultiConstraintTransformer[K, V, L](constraint: MultiPrerequisiteConstraint[K, V, L]) extends Transformer[K, V, KeyValue[K, V]] {
+class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], graphTemplate: Graph[ConstraintNode, DiEdge])
+  extends Transformer[K, V, KeyValue[Redirect[K], V]] {
 
   private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   var context: ProcessorContext = _
-  var graph: Graph[ConstraintNode, DiEdge] = Graph.empty
+  var graphStore: KeyValueStore[L, Graph[ConstraintNode, DiEdge]] = _
+  var terminatedStore: KeyValueStore[L, Long] = _
 
   override def init(context: ProcessorContext): Unit = {
     this.context = context
 
-    constraint.constraints.foreach(c => {
-      val (before, after) = (ConstraintNode(c.before._2, seen = false, buffered = false),
-        ConstraintNode(c.after._2, seen = false, buffered = false))
-      this.graph.addEdge(before, after)(DiEdge)
-    })
+    require(graphTemplate.isAcyclic, "The constraints cannot be mutually exclusive")
 
-    require(this.graph.isAcyclic, "The constraints cannot be mutually exclusive")
+    visualizeGraph("graph") // TODO move to ConstrainedKStream
 
-    visualizeGraph("graph")
+    this.graphStore = context.getStateStore[KeyValueStore[L, Graph[ConstraintNode, DiEdge]]]("Graph")
+    this.terminatedStore = context.getStateStore[KeyValueStore[L, Long]]("Terminated")
   }
 
-  override def transform(key: K, value: V): KeyValue[K, V] = {
-    val graphStore = context.getStateStore[KeyValueStore[L, Graph[ConstraintNode, DiEdge]]]("Graph")
+  override def transform(key: K, value: V): KeyValue[Redirect[K], V] = {
     val link = constraint.link.apply(key, value)
 
-    // check if there is ANY constraint specified for this event
-    if (!constraint.constraints.exists(p => p.before._1.apply(key, value) || p.after._1.apply(key, value))) {
-      context.forward(key, value)
+    // check if the process for this link is terminated
+    if (Option(terminatedStore.get(link)).isDefined) {
+      context.forward(Redirect(key, redirect = true), value)
       return null
     }
 
-    graphStore.putIfAbsent(link, this.graph.clone())
+    // check if there is ANY prerequisite constraint specified for this event
+    if (constraintsNotApplicable(constraint, key, value)) {
+      context.forward(Redirect(key, redirect = false), value)
+      return null
+    }
+
+    graphStore.putIfAbsent(link, graphTemplate.clone())
     val graph: Graph[ConstraintNode, DiEdge] = graphStore.get(link)
 
     val constraintNode = graph.nodes.find(node => constraint.names(node.value.name).apply(key, value))
     val before: Set[graph.NodeT] = constraintNode.get.diPredecessors
 
     if (before.isEmpty || before.forall(node => node.value.seen)) {
-      context.forward(key, value)
+      forward(constraintNode.get.value.nodeType, key, value)
       constraintNode.get.value.seen = true
 
       // get possible buffered
       val nodeOrdering: graph.NodeOrdering = graph.NodeOrdering((node1, node2) => node1.incoming.size.compare(node2.incoming.size))
       val successors = graph.innerNodeTraverser(constraintNode.get).withOrdering(nodeOrdering)
 
-      val bufferedToPublish = ListBuffer.empty[ValueAndTimestamp[KeyValue[K, V]]]
+      val bufferedToPublish = ListBuffer.empty[(ValueAndTimestamp[KeyValue[K, V]], String)]
       successors.toList.tail.foreach(node => {
         if (node.value.buffered && node.diPredecessors.forall(node => node.value.seen)) {
           val buffered = bufferStore(node.value.name).get(link)
-          bufferedToPublish.addAll(buffered)
+          val zipped = buffered.zip(LazyList.continually(node.value.nodeType))
+          bufferedToPublish.addAll(zipped)
           bufferStore(node.value.name).delete(link)
 
           node.value.seen = true
@@ -76,16 +81,16 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiPrerequisiteConstrain
       })
 
       bufferedToPublish
-        .sortBy(_.timestamp())
-        .map(_.value())
-        .foreach(record => context.forward(record.key, record.value))
+        .sortBy(_._1.timestamp())
+        .foreach(record => forward(record._2, record._1.value().key, record._1.value().value))
 
       graphStore.put(link, graph)
     } else {
       // buffer this event
       val buffered = Option(bufferStore(constraintNode.get.value.name).get(link))
         .getOrElse(List.empty[ValueAndTimestamp[KeyValue[K, V]]])
-      val newList = buffered.appended(ValueAndTimestamp.make(KeyValue.pair(key, value), context.timestamp()))
+      val newList = buffered
+        .appended(ValueAndTimestamp.make(KeyValue.pair(key, value), context.timestamp()))
       bufferStore(constraintNode.get.value.name).put(link, newList)
 
       constraintNode.get.value.buffered = true
@@ -105,14 +110,31 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiPrerequisiteConstrain
     val dotRoot = DotRootGraph(directed = true, id = Some(Id("Constraints")))
     def edgeTransformer(innerEdge: ImGraph[ConstraintNode, DiEdge]#EdgeT): Option[(DotGraph, DotEdgeStmt)] = {
       val edge = innerEdge.edge
-      Some(dotRoot,
-        DotEdgeStmt(NodeId(edge.from.value.name), NodeId(edge.to.value.name), Nil))
+      Some(dotRoot, DotEdgeStmt(NodeId(edge.from.value.name), NodeId(edge.to.value.name), Nil))
     }
 
-    Graphviz.fromString(this.graph.toDot(dotRoot, edgeTransformer))
+    Graphviz.fromString(graphTemplate.toDot(dotRoot, edgeTransformer))
       .scale(2)
       .render(Format.PNG)
       .toFile(new File(s"graphs/$name.png"))
   }
 
+  private def constraintsNotApplicable(constraint: MultiConstraint[K, V, L], key: K, value: V): Boolean = {
+    !constraint.prerequisites.exists(p => p.before._1.apply(key, value) || p.after._1.apply(key, value))
+  }
+
+  private def forward(nodeType: String, key: K, value: V): Unit = {
+    val link = constraint.link.apply(key, value)
+
+    if (nodeType == "TERMINAL" && Option(terminatedStore.get(link)).isEmpty) {
+      context.forward(Redirect(key, redirect = false), value)
+
+      terminatedStore.put(link, context.timestamp())
+      graphStore.delete(link)
+    } else if (nodeType == "TERMINAL" &&  Option(terminatedStore.get(link)).isDefined) {
+      context.forward(Redirect(key, redirect = true), value)
+    } else {
+      context.forward(Redirect(key, redirect = false), value)
+    }
+  }
 }

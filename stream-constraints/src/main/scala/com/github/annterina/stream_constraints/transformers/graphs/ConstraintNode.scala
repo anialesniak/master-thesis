@@ -1,6 +1,8 @@
 package com.github.annterina.stream_constraints.transformers.graphs
 
-case class ConstraintNode(name: String, var seen: Boolean, var buffered: Boolean) {
+import com.github.annterina.stream_constraints.transformers.graphs.NodeTypes.NodeType
+
+case class ConstraintNode(name: String, var seen: Boolean, var buffered: Boolean, var nodeType: String) {
 
   override def hashCode(): Int =
     name.hashCode
@@ -11,4 +13,9 @@ case class ConstraintNode(name: String, var seen: Boolean, var buffered: Boolean
       case _ => super.equals(obj)
     }
   }
+}
+
+object NodeTypes extends Enumeration {
+  type NodeType = Value
+  val Standard, Terminal = Value
 }

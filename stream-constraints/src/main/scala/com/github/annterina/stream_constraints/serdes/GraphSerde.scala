@@ -23,7 +23,7 @@ object GraphSerde extends Serde[Graph[ConstraintNode, DiEdge]] {
   private def descriptor: Descriptor[ConstraintNode] = {
     val nodeDescriptor = new NodeDescriptor[ConstraintNode](typeId = "Nodes")  {
       def id(node: Any): String = node match {
-        case ConstraintNode(name, _, _) => name
+        case ConstraintNode(name, _, _, _) => name
       }
     }
     new Descriptor[ConstraintNode](nodeDescriptor, Di.descriptor[ConstraintNode]())

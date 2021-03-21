@@ -27,11 +27,13 @@ trait Constraint[K, V, L] {
   }
 }
 
-case class MultiPrerequisiteConstraint[K, V, L](constraints : Set[Prerequisite[K, V]],
-                                                names: Map[String, (K, V) => Boolean]) extends Constraint[K, V, L] {
+case class MultiConstraint[K, V, L](prerequisites : Set[Prerequisite[K, V]],
+                                    terminals: Set[Terminal[K, V]],
+                                    names: Map[String, (K, V) => Boolean],
+                                    redirectTopic: Option[String]) extends Constraint[K, V, L] {
 
 }
 
-case class Prerequisite[K, V](before: ((K, V) => Boolean, String), after: ((K, V) => Boolean, String)) {
+case class Prerequisite[K, V](before: ((K, V) => Boolean, String), after: ((K, V) => Boolean, String)) {}
 
-}
+case class Terminal[K, V](terminal: ((K, V) => Boolean, String)) {}
