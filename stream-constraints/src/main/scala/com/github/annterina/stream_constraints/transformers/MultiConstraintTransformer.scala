@@ -1,27 +1,19 @@
 package com.github.annterina.stream_constraints.transformers
 
-import java.io.File
-
 import com.github.annterina.stream_constraints.constraints.MultiConstraint
-import com.github.annterina.stream_constraints.transformers.graphs.{ConstraintNode, NodeTypes}
-import guru.nidi.graphviz.engine.{Format, Graphviz}
+import com.github.annterina.stream_constraints.transformers.graphs.ConstraintNode
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.Transformer
 import org.apache.kafka.streams.processor.{ProcessorContext, To}
 import org.apache.kafka.streams.state.{KeyValueStore, ValueAndTimestamp}
-import org.slf4j.{Logger, LoggerFactory}
 import scalax.collection.GraphEdge.DiEdge
-import scalax.collection.io.dot.{DotEdgeStmt, DotGraph, DotRootGraph, Id, NodeId, graph2DotExport}
 import scalax.collection.mutable.Graph
-import scalax.collection.{Graph => ImGraph}
 
 import scala.collection.mutable.ListBuffer
 
 
 class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], graphTemplate: Graph[ConstraintNode, DiEdge])
   extends Transformer[K, V, KeyValue[Redirect[K], V]] {
-
-  private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   var context: ProcessorContext = _
   var graphStore: KeyValueStore[L, Graph[ConstraintNode, DiEdge]] = _
@@ -32,7 +24,8 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
 
     require(graphTemplate.isAcyclic, "The constraints cannot be mutually exclusive")
 
-    visualizeGraph("graph") // TODO move to ConstrainedKStream
+    val terminalNodes = graphTemplate.nodes.filter(node => node.value.nodeType == "TERMINAL")
+    require(terminalNodes.forall(node => node.diSuccessors.isEmpty), "Terminal nodes cannot be prerequisites")
 
     this.graphStore = context.getStateStore[KeyValueStore[L, Graph[ConstraintNode, DiEdge]]]("Graph")
     this.terminatedStore = context.getStateStore[KeyValueStore[L, Long]]("Terminated")
@@ -104,19 +97,6 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
 
   private def bufferStore(name: String): KeyValueStore[L, List[ValueAndTimestamp[KeyValue[K, V]]]] = {
     context.getStateStore[KeyValueStore[L, List[ValueAndTimestamp[KeyValue[K, V]]]]](name)
-  }
-
-  private def visualizeGraph(name: String): File = {
-    val dotRoot = DotRootGraph(directed = true, id = Some(Id("Constraints")))
-    def edgeTransformer(innerEdge: ImGraph[ConstraintNode, DiEdge]#EdgeT): Option[(DotGraph, DotEdgeStmt)] = {
-      val edge = innerEdge.edge
-      Some(dotRoot, DotEdgeStmt(NodeId(edge.from.value.name), NodeId(edge.to.value.name), Nil))
-    }
-
-    Graphviz.fromString(graphTemplate.toDot(dotRoot, edgeTransformer))
-      .scale(2)
-      .render(Format.PNG)
-      .toFile(new File(s"graphs/$name.png"))
   }
 
   private def constraintsNotApplicable(constraint: MultiConstraint[K, V, L], key: K, value: V): Boolean = {
