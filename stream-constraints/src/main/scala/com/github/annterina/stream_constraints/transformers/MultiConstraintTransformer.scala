@@ -1,16 +1,15 @@
 package com.github.annterina.stream_constraints.transformers
 
 import com.github.annterina.stream_constraints.constraints.MultiConstraint
-import com.github.annterina.stream_constraints.transformers.graphs.ConstraintNode
+import com.github.annterina.stream_constraints.graphs.ConstraintNode
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.Transformer
-import org.apache.kafka.streams.processor.{ProcessorContext, To}
+import org.apache.kafka.streams.processor.ProcessorContext
 import org.apache.kafka.streams.state.{KeyValueStore, ValueAndTimestamp}
 import scalax.collection.GraphEdge.DiEdge
 import scalax.collection.mutable.Graph
 
 import scala.collection.mutable.ListBuffer
-
 
 class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], graphTemplate: Graph[ConstraintNode, DiEdge])
   extends Transformer[K, V, KeyValue[Redirect[K], V]] {
@@ -108,10 +107,9 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
 
     if (nodeType == "TERMINAL" && Option(terminatedStore.get(link)).isEmpty) {
       context.forward(Redirect(key, redirect = false), value)
-
       terminatedStore.put(link, context.timestamp())
       graphStore.delete(link)
-    } else if (nodeType == "TERMINAL" &&  Option(terminatedStore.get(link)).isDefined) {
+    } else if (nodeType == "TERMINAL" && Option(terminatedStore.get(link)).isDefined) {
       context.forward(Redirect(key, redirect = true), value)
     } else {
       context.forward(Redirect(key, redirect = false), value)

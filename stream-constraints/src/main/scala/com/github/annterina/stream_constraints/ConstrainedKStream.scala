@@ -1,21 +1,16 @@
 package com.github.annterina.stream_constraints
 
-import java.io.File
-
 import com.github.annterina.stream_constraints.constraints.{Constraint, MultiConstraint}
+import com.github.annterina.stream_constraints.graphs.{ConstraintNode, GraphVisualization}
 import com.github.annterina.stream_constraints.serdes.{GraphSerde, KeyValueListSerde, KeyValueSerde}
-import com.github.annterina.stream_constraints.transformers.graphs.ConstraintNode
-import com.github.annterina.stream_constraints.transformers.{MultiConstraintTransformer, Redirect, TerminalTransformer}
-import guru.nidi.graphviz.engine.{Format, Graphviz}
+import com.github.annterina.stream_constraints.transformers.{MultiConstraintTransformer, Redirect}
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.scala.StreamsBuilder
 import org.apache.kafka.streams.scala.kstream.{KStream, Produced}
 import org.apache.kafka.streams.scala.serialization.Serdes
 import org.apache.kafka.streams.state.{KeyValueStore, StoreBuilder, Stores, ValueAndTimestamp}
 import scalax.collection.GraphEdge.DiEdge
-import scalax.collection.io.dot.{DotEdgeStmt, DotGraph, DotRootGraph, Id, NodeId, graph2DotExport}
 import scalax.collection.mutable.Graph
-import scalax.collection.{Graph => ImGraph}
 
 import scala.collection.mutable
 
@@ -117,21 +112,9 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
       }
     })
 
-    visualizeGraph(graph)
+    GraphVisualization.visualize(graph)
 
     graph
   }
 
-  private def visualizeGraph(graph: Graph[ConstraintNode, DiEdge]): File = {
-    val dotRoot = DotRootGraph(directed = true, id = Some(Id("Constraints")))
-    def edgeTransformer(innerEdge: ImGraph[ConstraintNode, DiEdge]#EdgeT): Option[(DotGraph, DotEdgeStmt)] = {
-      val edge = innerEdge.edge
-      Some(dotRoot, DotEdgeStmt(NodeId(edge.from.value.name), NodeId(edge.to.value.name), Nil))
-    }
-
-    Graphviz.fromString(graph.toDot(dotRoot, edgeTransformer))
-      .scale(2)
-      .render(Format.PNG)
-      .toFile(new File(s"graphs/constraints.png"))
-  }
 }

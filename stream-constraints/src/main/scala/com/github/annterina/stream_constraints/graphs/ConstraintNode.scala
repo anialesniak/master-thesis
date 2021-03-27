@@ -1,6 +1,4 @@
-package com.github.annterina.stream_constraints.transformers.graphs
-
-import com.github.annterina.stream_constraints.transformers.graphs.NodeTypes.NodeType
+package com.github.annterina.stream_constraints.graphs
 
 case class ConstraintNode(name: String, var seen: Boolean, var buffered: Boolean, var nodeType: String) {
 

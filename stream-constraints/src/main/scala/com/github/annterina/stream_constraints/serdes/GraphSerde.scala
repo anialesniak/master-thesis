@@ -1,6 +1,6 @@
 package com.github.annterina.stream_constraints.serdes
 
-import com.github.annterina.stream_constraints.transformers.graphs.ConstraintNode
+import com.github.annterina.stream_constraints.graphs.ConstraintNode
 import org.apache.kafka.common.serialization.{Deserializer, Serde, Serializer}
 import scalax.collection.GraphEdge.DiEdge
 import scalax.collection.io.json.{JsonGraph, JsonGraphCoreCompanion}
