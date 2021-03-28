@@ -1,5 +1,6 @@
 package com.github.annterina.stream_constraints.constraints
 
+import com.github.annterina.stream_constraints.constraints.window.WindowConstraint
 import org.apache.kafka.common.serialization.Serde
 
 trait Constraint[K, V, L] {
@@ -28,6 +29,7 @@ trait Constraint[K, V, L] {
 }
 
 case class MultiConstraint[K, V, L](prerequisites : Set[Prerequisite[K, V]],
+                                    windowConstraint: Set[WindowConstraint[K, V]],
                                     terminals: Set[Terminal[K, V]],
                                     names: Map[String, (K, V) => Boolean],
                                     redirectTopic: Option[String]) extends Constraint[K, V, L] {
