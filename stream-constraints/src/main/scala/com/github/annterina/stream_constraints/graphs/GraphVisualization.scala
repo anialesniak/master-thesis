@@ -33,7 +33,7 @@ object GraphVisualization {
   }
 
   private def nodeTransformer(innerNode: ImGraph[ConstraintNode, LDiEdge]#NodeT): Option[(DotGraph, DotNodeStmt)] =
-    if (innerNode.value.nodeType == "TERMINAL") {
+    if (innerNode.value.terminal) {
       Some(dotRoot, DotNodeStmt(NodeId(innerNode.value.name), List(DotAttr(Id("shape"), Id("doublecircle")))))
     } else None
 }

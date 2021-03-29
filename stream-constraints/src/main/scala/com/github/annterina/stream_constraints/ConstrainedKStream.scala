@@ -99,23 +99,21 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
     val graph = Graph.empty[ConstraintNode, LDiEdge]
 
     constraint.prerequisites.foreach(c => {
-      val (before, after) = (ConstraintNode(c.before._2, seen = false, buffered = false, "STANDARD"),
-        ConstraintNode(c.after._2, seen = false, buffered = false, "STANDARD"))
+      val (before, after) = (ConstraintNode(c.before._2), ConstraintNode(c.after._2))
       graph.add((before ~+> after)(GeneralLabel))
     })
 
     constraint.windowConstraints.foreach(c => {
-      val (before, after) = (ConstraintNode(c.before._2, seen = false, buffered = false, "STANDARD"),
-        ConstraintNode(c.after._2, seen = false, buffered = false, "STANDARD"))
+      val (before, after) = (ConstraintNode(c.before._2), ConstraintNode(c.after._2))
       graph.add((before ~+> after)(WindowLabel(c.window, c.action)))
     })
 
     constraint.terminals.foreach(c => {
       val node = graph.nodes.find(n => n.value.name == c.terminal._2)
       if (node.isDefined)
-        node.get.value.nodeType = "TERMINAL"
+        node.get.value.terminal = true
       else {
-        graph.add(ConstraintNode(c.terminal._2, seen = false, buffered = false, "TERMINAL"))
+        graph.add(ConstraintNode(c.terminal._2, terminal = true))
       }
     })
 

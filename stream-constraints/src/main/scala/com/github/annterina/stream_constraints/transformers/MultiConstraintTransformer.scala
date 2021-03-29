@@ -23,7 +23,7 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
 
     require(graphTemplate.isAcyclic, "The constraints cannot be mutually exclusive")
 
-    val terminalNodes = graphTemplate.nodes.filter(node => node.value.nodeType == "TERMINAL")
+    val terminalNodes = graphTemplate.nodes.filter(_.value.terminal)
     require(terminalNodes.forall(node => node.diSuccessors.isEmpty), "Terminal nodes cannot be prerequisites")
 
     this.graphStore = context.getStateStore[KeyValueStore[L, Graph[ConstraintNode, LDiEdge]]]("Graph")
@@ -53,18 +53,18 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
     val before: Set[graph.NodeT] = constraintNode.get.diPredecessors
 
     if (before.isEmpty || before.forall(node => node.value.seen)) {
-      forward(constraintNode.get.value.nodeType, key, value)
+      forward(constraintNode.get.value.terminal, key, value)
       constraintNode.get.value.seen = true
 
       // get possible buffered
       val nodeOrdering: graph.NodeOrdering = graph.NodeOrdering((node1, node2) => node1.incoming.size.compare(node2.incoming.size))
       val successors = graph.innerNodeTraverser(constraintNode.get).withOrdering(nodeOrdering)
 
-      val bufferedToPublish = ListBuffer.empty[(ValueAndTimestamp[KeyValue[K, V]], String)]
+      val bufferedToPublish = ListBuffer.empty[(ValueAndTimestamp[KeyValue[K, V]], Boolean)]
       successors.toList.tail.foreach(node => {
         if (node.value.buffered && node.diPredecessors.forall(node => node.value.seen)) {
           val buffered = bufferStore(node.value.name).get(link)
-          val zipped = buffered.zip(LazyList.continually(node.value.nodeType))
+          val zipped = buffered.zip(LazyList.continually(node.value.terminal))
           bufferedToPublish.addAll(zipped)
           bufferStore(node.value.name).delete(link)
 
@@ -103,14 +103,14 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
     !constraint.prerequisites.exists(p => p.before._1.apply(key, value) || p.after._1.apply(key, value))
   }
 
-  private def forward(nodeType: String, key: K, value: V): Unit = {
+  private def forward(isTerminal: Boolean, key: K, value: V): Unit = {
     val link = constraint.link.apply(key, value)
 
-    if (nodeType == "TERMINAL" && Option(terminatedStore.get(link)).isEmpty) {
+    if (isTerminal && Option(terminatedStore.get(link)).isEmpty) {
       context.forward(Redirect(key, redirect = false), value)
       terminatedStore.put(link, context.timestamp())
       graphStore.delete(link)
-    } else if (nodeType == "TERMINAL" && Option(terminatedStore.get(link)).isDefined) {
+    } else if (isTerminal && Option(terminatedStore.get(link)).isDefined) {
       context.forward(Redirect(key, redirect = true), value)
     } else {
       context.forward(Redirect(key, redirect = false), value)
