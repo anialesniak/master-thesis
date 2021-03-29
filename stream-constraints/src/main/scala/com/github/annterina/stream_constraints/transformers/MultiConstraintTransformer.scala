@@ -6,16 +6,16 @@ import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.Transformer
 import org.apache.kafka.streams.processor.ProcessorContext
 import org.apache.kafka.streams.state.{KeyValueStore, ValueAndTimestamp}
-import scalax.collection.GraphEdge.DiEdge
+import scalax.collection.edge.LDiEdge
 import scalax.collection.mutable.Graph
 
 import scala.collection.mutable.ListBuffer
 
-class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], graphTemplate: Graph[ConstraintNode, DiEdge])
+class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], graphTemplate: Graph[ConstraintNode, LDiEdge])
   extends Transformer[K, V, KeyValue[Redirect[K], V]] {
 
   var context: ProcessorContext = _
-  var graphStore: KeyValueStore[L, Graph[ConstraintNode, DiEdge]] = _
+  var graphStore: KeyValueStore[L, Graph[ConstraintNode, LDiEdge]] = _
   var terminatedStore: KeyValueStore[L, Long] = _
 
   override def init(context: ProcessorContext): Unit = {
@@ -26,7 +26,7 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
     val terminalNodes = graphTemplate.nodes.filter(node => node.value.nodeType == "TERMINAL")
     require(terminalNodes.forall(node => node.diSuccessors.isEmpty), "Terminal nodes cannot be prerequisites")
 
-    this.graphStore = context.getStateStore[KeyValueStore[L, Graph[ConstraintNode, DiEdge]]]("Graph")
+    this.graphStore = context.getStateStore[KeyValueStore[L, Graph[ConstraintNode, LDiEdge]]]("Graph")
     this.terminatedStore = context.getStateStore[KeyValueStore[L, Long]]("Terminated")
   }
 
@@ -40,13 +40,14 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
     }
 
     // check if there is ANY prerequisite constraint specified for this event
+    // TODO add terminals here
     if (constraintsNotApplicable(constraint, key, value)) {
       context.forward(Redirect(key, redirect = false), value)
       return null
     }
 
     graphStore.putIfAbsent(link, graphTemplate.clone())
-    val graph: Graph[ConstraintNode, DiEdge] = graphStore.get(link)
+    val graph: Graph[ConstraintNode, LDiEdge] = graphStore.get(link)
 
     val constraintNode = graph.nodes.find(node => constraint.names(node.value.name).apply(key, value))
     val before: Set[graph.NodeT] = constraintNode.get.diPredecessors

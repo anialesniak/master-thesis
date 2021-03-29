@@ -32,7 +32,14 @@ class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
       .swap
 
     val constraints = new ConstraintBuilder[String, OrderEvent, Integer]
+      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
+        ((_, e) => e.action == "UPDATED", "Order Updated"))
+      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
+        ((_, e) => e.action == "CANCELLED", "Order Cancelled"))
+      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
+        ((_, e) => e.action == "DELETED", "Order Deleted"))
       .windowConstraint(cancelledUpdatedWindow)
+      .terminal(((_, e) => e.action == "DELETED", "Order Deleted"))
       .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 

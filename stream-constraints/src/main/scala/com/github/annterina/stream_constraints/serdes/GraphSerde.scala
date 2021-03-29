@@ -1,21 +1,21 @@
 package com.github.annterina.stream_constraints.serdes
 
-import com.github.annterina.stream_constraints.graphs.ConstraintNode
+import com.github.annterina.stream_constraints.graphs.{ConstraintLabel, ConstraintNode}
 import org.apache.kafka.common.serialization.{Deserializer, Serde, Serializer}
-import scalax.collection.GraphEdge.DiEdge
+import scalax.collection.edge.LDiEdge
 import scalax.collection.io.json.{JsonGraph, JsonGraphCoreCompanion}
-import scalax.collection.io.json.descriptor.predefined.Di
-import scalax.collection.io.json.descriptor.{Descriptor, NodeDescriptor}
+import scalax.collection.io.json.descriptor.{Descriptor, LEdgeDescriptor, NodeDescriptor}
+import scalax.collection.io.json.serializer.LEdgeSerializer
 import scalax.collection.mutable.Graph
 
-object GraphSerde extends Serde[Graph[ConstraintNode, DiEdge]] {
+object GraphSerde extends Serde[Graph[ConstraintNode, LDiEdge]] {
 
-  override def serializer(): Serializer[Graph[ConstraintNode, DiEdge]] =
-    (_: String, data: Graph[ConstraintNode, DiEdge]) => {
+  override def serializer(): Serializer[Graph[ConstraintNode, LDiEdge]] =
+    (_: String, data: Graph[ConstraintNode, LDiEdge]) => {
       data.toJson(descriptor).getBytes
     }
 
-  override def deserializer(): Deserializer[Graph[ConstraintNode, DiEdge]] =
+  override def deserializer(): Deserializer[Graph[ConstraintNode, LDiEdge]] =
     (_: String, data: Array[Byte]) => {
       Graph.fromJson(new String(data), descriptor)
     }
@@ -26,6 +26,9 @@ object GraphSerde extends Serde[Graph[ConstraintNode, DiEdge]] {
         case ConstraintNode(name, _, _, _) => name
       }
     }
-    new Descriptor[ConstraintNode](nodeDescriptor, Di.descriptor[ConstraintNode]())
+    val serializer = new LEdgeSerializer[ConstraintLabel](new ConstraintLabelSerde)
+    val edgeDescriptor = new LEdgeDescriptor[ConstraintNode, LDiEdge, LDiEdge.type, ConstraintLabel](
+      LDiEdge, new ConstraintLabel, Some(serializer), List(classOf[ConstraintLabel]))
+    new Descriptor[ConstraintNode](nodeDescriptor, edgeDescriptor)
   }
 }

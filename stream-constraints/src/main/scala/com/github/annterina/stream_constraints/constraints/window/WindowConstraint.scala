@@ -9,6 +9,15 @@ case class WindowConstraint[K, V](before: ((K, V) => Boolean, String),
 
 sealed trait WindowAction
 
-case object Swap extends WindowAction
-case object DropBefore extends WindowAction
-case object DropAfter extends WindowAction
+case object Swap extends WindowAction {
+  override def toString: String = "Swap"
+}
+
+case object DropBefore extends WindowAction {
+  override def toString: String = "Drop former"
+}
+
+case object DropAfter extends WindowAction {
+  override def toString: String = "Drop latter"
+
+}

@@ -22,5 +22,6 @@ libraryDependencies ++= kafkaStreamsDependencies ++ Seq(
   "org.scala-graph"              %%     "graph-core"                  %   "1.13.2",
   "org.scala-graph"              %%     "graph-json"                  %   "1.13.0",
   "org.scala-graph"              %%     "graph-dot"                   %   "1.13.0",
-  "guru.nidi"                    %      "graphviz-java"               %   "0.18.1"
+  "guru.nidi"                    %      "graphviz-java"               %   "0.18.1",
+  "net.liftweb"                  %%     "lift-json"                   %   "3.4.3"
 )
