@@ -3,8 +3,8 @@ package com.github.annterina.stream_constraints.example
 import java.time.Duration
 import java.util.Properties
 
-import com.github.annterina.stream_constraints.{CStreamsBuilder, ConstrainedKStream}
-import com.github.annterina.stream_constraints.constraints.{Constraint, ConstraintBuilder}
+import com.github.annterina.stream_constraints.CStreamsBuilder
+import com.github.annterina.stream_constraints.constraints.ConstraintBuilder
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.kstream.{Consumed, Produced}

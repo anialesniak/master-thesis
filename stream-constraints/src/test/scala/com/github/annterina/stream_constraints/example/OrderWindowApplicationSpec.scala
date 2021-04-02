@@ -1,6 +1,6 @@
 package com.github.annterina.stream_constraints.example
 
-import java.time.Duration
+import java.time.{Duration, Instant}
 import java.util.Properties
 
 import com.github.annterina.stream_constraints.CStreamsBuilder
@@ -28,15 +28,13 @@ class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
     val cancelledUpdatedWindow = new WindowConstraintBuilder[String, OrderEvent]
       .before((_, e) => e.action == "CANCELLED", "Order Cancelled")
       .after((_, e) => e.action == "UPDATED", "Order Updated")
-      .window(Duration.ofSeconds(1))
+      .window(Duration.ofSeconds(10))
       .swap
 
     val constraints = new ConstraintBuilder[String, OrderEvent, Integer]
-      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"), ((_, e) => e.action == "UPDATED", "Order Updated"))
-      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"), ((_, e) => e.action == "CANCELLED", "Order Cancelled"))
-      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"), ((_, e) => e.action == "DELETED", "Order Deleted"))
+      .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
+        ((_, e) => e.action == "UPDATED", "Order Updated"))
       .windowConstraint(cancelledUpdatedWindow)
-      .terminal(((_, e) => e.action == "DELETED", "Order Deleted"))
       .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
@@ -69,31 +67,20 @@ class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
 
   describe("Order Terminal Application") {
 
-    it("should emit the prerequisite event") {
-      inputTopic.pipeInput("123", OrderEvent(1, "CREATED"))
+    it("should detect and swap events in the window") {
+      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
+      inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
+      inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(2))
 
       val output = outputTopic.readKeyValue()
 
+      assert(output.key == "456")
+      assert(output.value.key == 1)
+      assert(output.value.action == "UPDATED")
+
       assert(output.key == "123")
       assert(output.value.key == 1)
-      assert(output.value.action == "CREATED")
-    }
-
-    it("should publish prerequisite event and terminal event") {
-      inputTopic.pipeInput("123", OrderEvent(1, "CREATED"))
-      inputTopic.pipeInput("456", OrderEvent(1, "DELETED"))
-
-      val firstOutput = outputTopic.readKeyValue()
-
-      assert(firstOutput.key == "123")
-      assert(firstOutput.value.key == 1)
-      assert(firstOutput.value.action == "CREATED")
-
-      val secondOutput = outputTopic.readKeyValue()
-
-      assert(secondOutput.key == "456")
-      assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "DELETED")
+      assert(output.value.action == "CANCELLED")
     }
   }
 }

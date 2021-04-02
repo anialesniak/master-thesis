@@ -11,7 +11,6 @@ class ConstraintBuilder[K, V, L] {
   private val terminals: mutable.Set[Terminal[K, V]] = mutable.Set.empty
   private val windowConstraints: mutable.Set[WindowConstraint[K, V]] = mutable.Set.empty
 
-
   private val constraintNames: mutable.Map[String, (K, V) => Boolean] = mutable.Map.empty
   private var redirectTopic: Option[String] = None
 
@@ -41,7 +40,7 @@ class ConstraintBuilder[K, V, L] {
   }
 
   def link(f: (K, V) => L)(implicit serde: Serde[L]): ConditionConstraintBuilder[K, V, L] = {
-    val constraint = MultiConstraint[K, V, L](prerequisites.toSet, windowConstraints.toSet, terminals.toSet,
+    val constraint = Constraint[K, V, L](prerequisites.toSet, windowConstraints.toSet, terminals.toSet,
       constraintNames.toMap, redirectTopic).withLink(f, serde)
     new ConditionConstraintBuilder[K, V, L](constraint)
   }

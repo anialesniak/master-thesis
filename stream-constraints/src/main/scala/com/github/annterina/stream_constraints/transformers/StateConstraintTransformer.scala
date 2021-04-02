@@ -1,21 +1,21 @@
 package com.github.annterina.stream_constraints.transformers
 
-import com.github.annterina.stream_constraints.constraints.MultiConstraint
+import com.github.annterina.stream_constraints.constraints.Constraint
 import com.github.annterina.stream_constraints.graphs.ConstraintNode
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.Transformer
 import org.apache.kafka.streams.processor.ProcessorContext
 import org.apache.kafka.streams.state.{KeyValueStore, ValueAndTimestamp}
-import scalax.collection.edge.LDiEdge
+import scalax.collection.GraphEdge.DiEdge
 import scalax.collection.mutable.Graph
 
 import scala.collection.mutable.ListBuffer
 
-class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], graphTemplate: Graph[ConstraintNode, LDiEdge])
+class StateConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], graphTemplate: Graph[ConstraintNode, DiEdge])
   extends Transformer[K, V, KeyValue[Redirect[K], V]] {
 
   var context: ProcessorContext = _
-  var graphStore: KeyValueStore[L, Graph[ConstraintNode, LDiEdge]] = _
+  var graphStore: KeyValueStore[L, Graph[ConstraintNode, DiEdge]] = _
   var terminatedStore: KeyValueStore[L, Long] = _
 
   override def init(context: ProcessorContext): Unit = {
@@ -26,7 +26,7 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
     val terminalNodes = graphTemplate.nodes.filter(_.value.terminal)
     require(terminalNodes.forall(node => node.diSuccessors.isEmpty), "Terminal nodes cannot be prerequisites")
 
-    this.graphStore = context.getStateStore[KeyValueStore[L, Graph[ConstraintNode, LDiEdge]]]("Graph")
+    this.graphStore = context.getStateStore[KeyValueStore[L, Graph[ConstraintNode, DiEdge]]]("Graph")
     this.terminatedStore = context.getStateStore[KeyValueStore[L, Long]]("Terminated")
   }
 
@@ -47,7 +47,7 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
     }
 
     graphStore.putIfAbsent(link, graphTemplate.clone())
-    val graph: Graph[ConstraintNode, LDiEdge] = graphStore.get(link)
+    val graph: Graph[ConstraintNode, DiEdge] = graphStore.get(link)
 
     val constraintNode = graph.nodes.find(node => constraint.names(node.value.name).apply(key, value))
     val before: Set[graph.NodeT] = constraintNode.get.diPredecessors
@@ -99,7 +99,7 @@ class MultiConstraintTransformer[K, V, L](constraint: MultiConstraint[K, V, L], 
     context.getStateStore[KeyValueStore[L, List[ValueAndTimestamp[KeyValue[K, V]]]]](name)
   }
 
-  private def constraintsNotApplicable(constraint: MultiConstraint[K, V, L], key: K, value: V): Boolean = {
+  private def constraintsNotApplicable(constraint: Constraint[K, V, L], key: K, value: V): Boolean = {
     !constraint.prerequisites.exists(p => p.before._1.apply(key, value) || p.after._1.apply(key, value))
   }
 

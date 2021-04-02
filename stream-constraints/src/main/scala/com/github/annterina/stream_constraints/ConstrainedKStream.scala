@@ -1,14 +1,13 @@
 package com.github.annterina.stream_constraints
 
-import com.github.annterina.stream_constraints.constraints.{Constraint, MultiConstraint}
-import com.github.annterina.stream_constraints.graphs.{ConstraintNode, GeneralLabel, GraphVisualization, WindowLabel}
-import com.github.annterina.stream_constraints.serdes.{GraphSerde, KeyValueListSerde, KeyValueSerde}
-import com.github.annterina.stream_constraints.transformers.{MultiConstraintTransformer, Redirect}
-import org.apache.kafka.streams.KeyValue
+import com.github.annterina.stream_constraints.constraints.Constraint
+import com.github.annterina.stream_constraints.graphs.{ConstraintNode, GraphVisualization, WindowLabel}
+import com.github.annterina.stream_constraints.stores.PrerequisiteStores
+import com.github.annterina.stream_constraints.transformers.{Redirect, StateConstraintTransformer, WindowConstraintTransformer}
 import org.apache.kafka.streams.scala.StreamsBuilder
 import org.apache.kafka.streams.scala.kstream.{KStream, Produced}
-import org.apache.kafka.streams.scala.serialization.Serdes
-import org.apache.kafka.streams.state.{KeyValueStore, StoreBuilder, Stores, ValueAndTimestamp}
+import scalax.collection.GraphEdge.DiEdge
+import scalax.collection.GraphPredef.EdgeAssoc
 import scalax.collection.edge.Implicits.any2XEdgeAssoc
 import scalax.collection.edge.LDiEdge
 import scalax.collection.mutable.Graph
@@ -18,53 +17,47 @@ import scala.collection.mutable
 class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder) {
 
   def constrain(constraint: Constraint[K, V, L]): ConstrainedKStream[K, V, L] = {
-    constraint match {
-      case multiConstraint: MultiConstraint[K, V, L] =>
-        val graphs = graphStore(multiConstraint)
-        builder.addStateStore(graphs)
 
-        val terminated = terminatedStore(multiConstraint)
-        builder.addStateStore(terminated)
+    val storeProvider = PrerequisiteStores(constraint)
 
-        val names = multiConstraint.prerequisites
-          .foldLeft(mutable.Set.empty[String])((names, prerequisite) =>  {
-            val beforeName = prerequisite.before._2
-            if (!names.contains(beforeName)) {
-              names.add(beforeName)
-              builder.addStateStore(bufferStore(multiConstraint, beforeName))
+    val constraintStateStores = constraint.prerequisites
+      .foldLeft(mutable.Set.empty[String])((stores, prerequisite) => {
+        Seq(prerequisite.before._2, prerequisite.after._2)
+          .foreach(name => {
+            if (!stores.contains(name)) {
+              stores.add(name)
+              builder.addStateStore(storeProvider.bufferStore(name))
             }
+        })
 
-            val afterName = prerequisite.after._2
-            if (!names.contains(afterName)) {
-              names.add(afterName)
-              builder.addStateStore(bufferStore(multiConstraint, afterName))
-            }
-            names
-          })
+        stores
+      })
 
-        names.add(graphs.name())
-        names.add(terminated.name())
+    val graphs = storeProvider.graphStore()
+    builder.addStateStore(graphs)
+    constraintStateStores.add(graphs.name)
 
-        multiConstraint.terminals.map(t => t.terminal._1)
 
-        val graphTemplate = createGraph(multiConstraint)
+    val terminated = storeProvider.terminatedStore()
+    builder.addStateStore(terminated)
+    constraintStateStores.add(terminated.name)
 
-        val branches: Array[KStream[Redirect[K], V]] = inner
-          .transform(() => new MultiConstraintTransformer(multiConstraint, graphTemplate), names.toList:_*)
-          .branch(
-            (key, _) => key.redirect,
-            (_, _) => true
-          )
+    val constraintGraph = windowConstraintGraph(constraint)
+    val graphTemplate = prerequisiteGraph(constraint)
+    GraphVisualization.visualize(constraintGraph, graphTemplate)
 
-        if (multiConstraint.redirectTopic.isDefined) {
-          branches(0)
-            .selectKey((redirectKey, _) => redirectKey.key)
-            .to(multiConstraint.redirectTopic.get)(Produced.`with`(constraint.keySerde, constraint.valueSerde))
-        }
+    //if (constraint.windowConstraints.nonEmpty)
+    val windowStream = inner
+      .transform(() => new WindowConstraintTransformer(constraint, constraintGraph))
 
-        val constrained = branches(1).selectKey((redirectKey, _) => redirectKey.key)
-        new ConstrainedKStream(constrained, builder)
-    }
+    val windowedConstrainedStream = redirect(windowStream, constraint)
+
+    val prerequisiteStream = windowedConstrainedStream
+      .transform(() => new StateConstraintTransformer(constraint, graphTemplate), constraintStateStores.toList:_*)
+
+    val prerequisiteConstrainedStream = redirect(prerequisiteStream, constraint)
+
+    new ConstrainedKStream(prerequisiteConstrainedStream, builder)
   }
 
   def map[KR, VR](mapper: (K, V) => (KR, VR)): ConstrainedKStream[KR, VR, L] =
@@ -76,36 +69,23 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
   def to(topic: String)(implicit produced: Produced[K, V]): Unit =
     inner.to(topic)(produced)
 
-
-  private def graphStore(constraint: Constraint[K, V, L]): StoreBuilder[KeyValueStore[L, Graph[ConstraintNode, LDiEdge]]] = {
-    val name = "Graph"
-    val graphStoreSupplier = Stores.persistentKeyValueStore(name)
-    Stores.keyValueStoreBuilder(graphStoreSupplier, constraint.linkSerde, GraphSerde)
-  }
-
-  private def bufferStore(constraint: Constraint[K, V, L], name: String): StoreBuilder[KeyValueStore[L, List[ValueAndTimestamp[KeyValue[K, V]]]]] = {
-    val storeSupplier = Stores.persistentKeyValueStore(name)
-    val keyValueSerde = new KeyValueSerde[K, V](constraint.keySerde, constraint.valueSerde)
-    Stores.keyValueStoreBuilder(storeSupplier, constraint.linkSerde, new KeyValueListSerde[K, V](keyValueSerde))
-  }
-
-  private def terminatedStore(constraint: Constraint[K, V, L]): StoreBuilder[KeyValueStore[L, Long]] = {
-    val name = "Terminated"
-    val storeSupplier = Stores.persistentKeyValueStore(name)
-    Stores.keyValueStoreBuilder(storeSupplier, constraint.linkSerde, Serdes.longSerde)
-  }
-
-  private def createGraph(constraint: MultiConstraint[K, V, L]): Graph[ConstraintNode, LDiEdge] = {
+  private def windowConstraintGraph(constraint: Constraint[K, V, L]): Graph[ConstraintNode, LDiEdge] = {
     val graph = Graph.empty[ConstraintNode, LDiEdge]
-
-    constraint.prerequisites.foreach(c => {
-      val (before, after) = (ConstraintNode(c.before._2), ConstraintNode(c.after._2))
-      graph.add((before ~+> after)(GeneralLabel))
-    })
 
     constraint.windowConstraints.foreach(c => {
       val (before, after) = (ConstraintNode(c.before._2), ConstraintNode(c.after._2))
       graph.add((before ~+> after)(WindowLabel(c.window, c.action)))
+    })
+
+    graph
+  }
+
+  private def prerequisiteGraph(constraint: Constraint[K, V, L]): Graph[ConstraintNode, DiEdge] = {
+    val graph = Graph.empty[ConstraintNode, DiEdge]
+
+    constraint.prerequisites.foreach(c => {
+      val (before, after) = (ConstraintNode(c.before._2), ConstraintNode(c.after._2))
+      graph.add(before ~> after)
     })
 
     constraint.terminals.foreach(c => {
@@ -117,9 +97,22 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
       }
     })
 
-    GraphVisualization.visualize(graph)
-
     graph
+  }
+
+  private def redirect(stream: KStream[Redirect[K], V], constraint: Constraint[K, V, L]): KStream[K, V] = {
+    val streamBranches = stream.branch(
+      (key, _) => key.redirect,
+      (_, _) => true
+    )
+
+    if (constraint.redirectTopic.isDefined) {
+      streamBranches(0)
+        .selectKey((redirectKey, _) => redirectKey.key)
+        .to(constraint.redirectTopic.get)(Produced.`with`(constraint.keySerde, constraint.valueSerde))
+    }
+
+    streamBranches(1).selectKey((redirectKey, _) => redirectKey.key)
   }
 
 }
