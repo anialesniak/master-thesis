@@ -12,7 +12,7 @@ import org.apache.kafka.streams.{StreamsConfig, TestInputTopic, TestOutputTopic,
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.funspec.AnyFunSpec
 
-class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
+class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
 
   private var testDriver: TopologyTestDriver = _
   private var inputTopic: TestInputTopic[String, OrderEvent] = _
@@ -31,8 +31,15 @@ class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
       .window(Duration.ofSeconds(10))
       .swap
 
+    val cancelledCreatedWindow = new WindowConstraintBuilder[String, OrderEvent]
+      .before((_, e) => e.action == "CANCELLED", "Order Cancelled")
+      .after((_, e) => e.action == "CREATED", "Order Created")
+      .window(Duration.ofSeconds(5))
+      .swap
+
     val constraints = new ConstraintBuilder[String, OrderEvent, Integer]
       .windowConstraint(cancelledUpdatedWindow)
+      .windowConstraint(cancelledCreatedWindow)
       .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
@@ -86,7 +93,7 @@ class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
     it("should detect multiple before and swap events in the window") {
       val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
       inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
-      inputTopic.pipeInput("456", OrderEvent(1, "CANCELLED"), timestamp.plusSeconds(1))
+      inputTopic.pipeInput("456", OrderEvent(1, "CREATED"), timestamp.plusSeconds(1))
       inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(2))
 
       val output = outputTopic.readKeyValue()
@@ -106,82 +113,6 @@ class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
       assert(thirdOutput.key == "456")
       assert(thirdOutput.value.key == 1)
       assert(thirdOutput.value.action == "CANCELLED")
-    }
-
-    it("should emit the before event when the stream time advances") {
-      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
-      inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
-      inputTopic.pipeInput("456", OrderEvent(1, "CREATED"), timestamp.plusSeconds(10))
-      inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(14))
-
-      val output = outputTopic.readKeyValue()
-
-      assert(output.key == "456")
-      assert(output.value.key == 1)
-      assert(output.value.action == "CREATED")
-
-      val secondOutput = outputTopic.readKeyValue()
-
-      assert(secondOutput.key == "123")
-      assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "CANCELLED")
-    }
-
-    it("should publish before event that dropped out of window after swap") {
-      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
-      inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
-      inputTopic.pipeInput("456", OrderEvent(1, "CANCELLED"), timestamp.plusSeconds(5))
-      inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(12))
-
-      val output = outputTopic.readKeyValue()
-
-      assert(output.key == "789")
-      assert(output.value.key == 1)
-      assert(output.value.action == "UPDATED")
-
-      val secondOutput = outputTopic.readKeyValue()
-
-      assert(secondOutput.key == "456")
-      assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "CANCELLED")
-
-      val thirdOutput = outputTopic.readKeyValue()
-
-      assert(thirdOutput.key == "123")
-      assert(thirdOutput.value.key == 1)
-      assert(thirdOutput.value.action == "CANCELLED")
-    }
-
-    it("should publish before event that dropped out of window before swap") {
-      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
-      inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
-      inputTopic.pipeInput("456", OrderEvent(1, "CANCELLED"), timestamp.plusSeconds(10))
-      inputTopic.pipeInput("789", OrderEvent(1, "CANCELLED"), timestamp.plusSeconds(11))
-      inputTopic.pipeInput("000", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(12))
-
-      val output = outputTopic.readKeyValue()
-
-      assert(output.key == "123")
-      assert(output.value.key == 1)
-      assert(output.value.action == "CANCELLED")
-
-      val secondOutput = outputTopic.readKeyValue()
-
-      assert(secondOutput.key == "000")
-      assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "UPDATED")
-
-      val thirdOutput = outputTopic.readKeyValue()
-
-      assert(thirdOutput.key == "456")
-      assert(thirdOutput.value.key == 1)
-      assert(thirdOutput.value.action == "CANCELLED")
-
-      val fourthOutput = outputTopic.readKeyValue()
-
-      assert(fourthOutput.key == "789")
-      assert(fourthOutput.value.key == 1)
-      assert(fourthOutput.value.action == "CANCELLED")
     }
   }
 }

@@ -18,19 +18,20 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
   override def init(context: ProcessorContext): Unit = {
     this.context = context
 
-    val first = constraint.windowConstraints.head
-    val firstStore = context.getStateStore[WindowStore[L, KeyValue[K, V]]](first.before._2)
+    constraint.windowConstraints.foreach(constraint => {
+      val store = context.getStateStore[WindowStore[L, KeyValue[K, V]]](constraint.before._2)
 
-    this.context.schedule(first.window.dividedBy(2), PunctuationType.STREAM_TIME, new Punctuator {
-      override def punctuate(timestamp: Long): Unit = {
-        val iter = firstStore.fetchAll(0, timestamp - first.window.toMillis)
-        while (iter.hasNext) {
-          val entry = iter.next
-          firstStore.put(entry.key.key(), null, entry.key.window().start())
-          context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
+      this.context.schedule(constraint.window.dividedBy(2), PunctuationType.STREAM_TIME, new Punctuator {
+        override def punctuate(timestamp: Long): Unit = {
+          val iter = store.fetchAll(0, timestamp - constraint.window.toMillis)
+          while (iter.hasNext) {
+            val entry = iter.next
+            store.put(entry.key.key(), null, entry.key.window().start())
+            context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
+          }
+          iter.close()
         }
-        iter.close()
-      }
+      })
     })
   }
 
