@@ -20,6 +20,7 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
 
     val storeProvider = PrerequisiteStores(constraint)
 
+    // TODO here we probably only need to add the store for "before"
     val constraintStateStores = constraint.prerequisites
       .foldLeft(mutable.Set.empty[String])((stores, prerequisite) => {
         Seq(prerequisite.before._2, prerequisite.after._2)
@@ -46,9 +47,19 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
     val graphTemplate = prerequisiteGraph(constraint)
     GraphVisualization.visualize(constraintGraph, graphTemplate)
 
+    val windowStateStores = constraint.windowConstraints
+      .foldLeft(mutable.Set.empty[String])((stores, windowConstraint) => {
+        val name = windowConstraint.before._2
+        if (!stores.contains(name)) {
+          stores.add(name)
+          builder.addStateStore(storeProvider.windowedStore(name, windowConstraint.window))
+        }
+        stores
+      })
+
     //if (constraint.windowConstraints.nonEmpty)
     val windowStream = inner
-      .transform(() => new WindowConstraintTransformer(constraint, constraintGraph))
+      .transform(() => new WindowConstraintTransformer(constraint, constraintGraph), windowStateStores.toList:_*)
 
     val windowedConstrainedStream = redirect(windowStream, constraint)
 

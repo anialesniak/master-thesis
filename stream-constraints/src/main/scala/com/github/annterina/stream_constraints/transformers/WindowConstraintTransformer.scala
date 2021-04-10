@@ -1,10 +1,12 @@
 package com.github.annterina.stream_constraints.transformers
 
 import com.github.annterina.stream_constraints.constraints.Constraint
-import com.github.annterina.stream_constraints.graphs.ConstraintNode
+import com.github.annterina.stream_constraints.constraints.window.{DropAfter, DropBefore, Swap}
+import com.github.annterina.stream_constraints.graphs.{ConstraintNode, WindowLabel}
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.Transformer
-import org.apache.kafka.streams.processor.ProcessorContext
+import org.apache.kafka.streams.processor.{ProcessorContext, PunctuationType, Punctuator}
+import org.apache.kafka.streams.state.WindowStore
 import scalax.collection.edge.LDiEdge
 import scalax.collection.mutable.Graph
 
@@ -15,16 +17,82 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
 
   override def init(context: ProcessorContext): Unit = {
     this.context = context
+
+    val first = constraint.windowConstraints.head
+    val firstStore = context.getStateStore[WindowStore[L, KeyValue[K, V]]](first.before._2)
+
+    this.context.schedule(first.window.dividedBy(2), PunctuationType.STREAM_TIME, new Punctuator {
+      override def punctuate(timestamp: Long): Unit = {
+        val iter = firstStore.fetchAll(0, timestamp - first.window.toMillis)
+        while (iter.hasNext) {
+          val entry = iter.next
+          firstStore.put(entry.key.key(), null, entry.key.window().start())
+          context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
+        }
+        iter.close()
+      }
+    })
   }
 
   override def transform(key: K, value: V): KeyValue[Redirect[K], V] = {
+    val link = constraint.link.apply(key, value)
 
     if (!windowConstraintsApplicable(key, value)) {
       context.forward(Redirect(key, redirect = false), value)
       return null
     }
 
-    context.forward(Redirect(key, redirect = false), value)
+    val constraintNode = graph.nodes.find(node => constraint.names(node.value.name).apply(key, value))
+    val before = constraintNode.get.diPredecessors
+
+    if (before.isEmpty) {
+      val store = context.getStateStore[WindowStore[L, KeyValue[K, V]]](constraintNode.get.value.name)
+      store.put(link, KeyValue.pair(key, value), context.timestamp())
+    } else {
+      before.foreach(nodeBefore => {
+        val store = context.getStateStore[WindowStore[L, KeyValue[K, V]]](nodeBefore.value.name)
+
+        val (before, after) = (nodeBefore.value, constraintNode.get.value)
+        val edge = graph.edges.find(e => e.from == before && e.to == after)
+        val label = edge.get.label.asInstanceOf[WindowLabel]
+        val now = context.timestamp()
+
+        val buffered = store.fetch(link, now - label.window.toMillis, now)
+
+        if (!buffered.hasNext) {
+          context.forward(Redirect(key, redirect = false), value)
+          return null
+        }
+
+        label.action match {
+          case Swap => {
+            context.forward(Redirect(key, redirect = false), value)
+            while (buffered.hasNext) {
+              val entry = buffered.next()
+              store.put(link, null, entry.key)
+              context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
+            }
+          }
+          case DropBefore => {
+            while (buffered.hasNext) {
+              val entry = buffered.next()
+              store.put(link, null, entry.key)
+            }
+            context.forward(Redirect(key, redirect = false), value)
+          }
+          case DropAfter => {
+            while (buffered.hasNext) {
+              val entry = buffered.next
+              store.put(link, null, entry.key)
+              context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
+            }
+          }
+        }
+
+        buffered.close()
+      })
+    }
+
     null
   }
 
