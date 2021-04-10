@@ -7,7 +7,8 @@ case class Constraint[K, V, L](prerequisites : Set[Prerequisite[K, V]],
                                     windowConstraints: Set[WindowConstraint[K, V]],
                                     terminals: Set[Terminal[K, V]],
                                     names: Map[String, (K, V) => Boolean],
-                                    redirectTopic: Option[String]) {
+                                    redirectTopic: Option[String],
+                                    untilWindowCloses: Boolean) {
 
   var link: (K, V) => L = _
   var linkSerde: Serde[L] = _

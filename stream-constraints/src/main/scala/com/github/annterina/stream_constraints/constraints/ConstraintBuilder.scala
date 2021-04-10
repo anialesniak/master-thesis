@@ -13,6 +13,7 @@ class ConstraintBuilder[K, V, L] {
 
   private val constraintNames: mutable.Map[String, (K, V) => Boolean] = mutable.Map.empty
   private var redirectTopic: Option[String] = None
+  private var fullWindows: Boolean = false
 
   def prerequisite(before: ((K, V) => Boolean, String), after: ((K, V) => Boolean, String)): ConstraintBuilder[K, V, L] = {
     prerequisites.add(new Prerequisite[K, V](before, after))
@@ -39,9 +40,15 @@ class ConstraintBuilder[K, V, L] {
     this
   }
 
+  def withFullWindows(): ConstraintBuilder[K, V, L] = {
+    fullWindows = true
+    this
+  }
+
+
   def link(f: (K, V) => L)(implicit serde: Serde[L]): ConditionConstraintBuilder[K, V, L] = {
     val constraint = Constraint[K, V, L](prerequisites.toSet, windowConstraints.toSet, terminals.toSet,
-      constraintNames.toMap, redirectTopic).withLink(f, serde)
+      constraintNames.toMap, redirectTopic, fullWindows).withLink(f, serde)
     new ConditionConstraintBuilder[K, V, L](constraint)
   }
 
