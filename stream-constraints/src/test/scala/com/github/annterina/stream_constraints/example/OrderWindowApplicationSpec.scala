@@ -183,5 +183,30 @@ class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
       assert(fourthOutput.value.key == 1)
       assert(fourthOutput.value.action == "CANCELLED")
     }
+
+    it("should ignore next after events after the first one") {
+      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
+      inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
+      inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(2))
+      inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(5))
+
+      val output = outputTopic.readKeyValue()
+
+      assert(output.key == "456")
+      assert(output.value.key == 1)
+      assert(output.value.action == "UPDATED")
+
+      val secondOutput = outputTopic.readKeyValue()
+
+      assert(secondOutput.key == "123")
+      assert(secondOutput.value.key == 1)
+      assert(secondOutput.value.action == "CANCELLED")
+
+      val thirdOutput = outputTopic.readKeyValue()
+
+      assert(thirdOutput.key == "789")
+      assert(thirdOutput.value.key == 1)
+      assert(thirdOutput.value.action == "UPDATED")
+    }
   }
 }

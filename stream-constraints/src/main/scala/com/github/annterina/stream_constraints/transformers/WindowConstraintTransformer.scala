@@ -66,28 +66,25 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
         }
 
         label.action match {
-          case Swap => {
+          case Swap =>
             context.forward(Redirect(key, redirect = false), value)
-            while (buffered.hasNext) {
+            while (!constraint.withFullWindows && buffered.hasNext) {
               val entry = buffered.next()
               store.put(link, null, entry.key)
               context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
             }
-          }
-          case DropBefore => {
-            while (buffered.hasNext) {
+          case DropBefore =>
+            while (!constraint.withFullWindows && buffered.hasNext) {
               val entry = buffered.next()
               store.put(link, null, entry.key)
             }
             context.forward(Redirect(key, redirect = false), value)
-          }
-          case DropAfter => {
-            while (buffered.hasNext) {
+          case DropAfter =>
+            while (!constraint.withFullWindows && buffered.hasNext) {
               val entry = buffered.next
-              store.put(link, null, entry.key)
-              context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
+                store.put(link, null, entry.key)
+                context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
             }
-          }
         }
 
         buffered.close()
