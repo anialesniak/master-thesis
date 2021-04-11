@@ -9,7 +9,7 @@ import org.apache.kafka.streams.state.internals.ValueAndTimestampSerde
 
 import scala.collection.mutable.ListBuffer
 
-class KeyValueListSerde[K, V](val keyValueSerde: Serde[KeyValue[K, V]]) extends Serde[List[ValueAndTimestamp[KeyValue[K, V]]]] {
+class TimestampedKeyValuesSerde[K, V](val keyValueSerde: Serde[KeyValue[K, V]]) extends Serde[List[ValueAndTimestamp[KeyValue[K, V]]]] {
 
   val IntSize: Int = 4
   val vtSerde = new ValueAndTimestampSerde(keyValueSerde)

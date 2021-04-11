@@ -10,6 +10,8 @@ import org.apache.kafka.streams.state.{WindowStore, WindowStoreIterator}
 import scalax.collection.edge.LDiEdge
 import scalax.collection.mutable.Graph
 
+import scala.collection.mutable.ListBuffer
+
 class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], graph: Graph[ConstraintNode, LDiEdge])
   extends Transformer[K, V, KeyValue[Redirect[K], V]] {
 
@@ -19,7 +21,7 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
     this.context = context
 
     constraint.windowConstraints.foreach(constraint => {
-      val store = context.getStateStore[WindowStore[L, KeyValue[K, V]]](constraint.before._2)
+      val store = context.getStateStore[WindowStore[L, List[KeyValue[K, V]]]](constraint.before._2)
 
       this.context.schedule(constraint.window.dividedBy(2), PunctuationType.STREAM_TIME, new Punctuator {
         override def punctuate(timestamp: Long): Unit = {
@@ -27,7 +29,7 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
           while (iter.hasNext) {
             val entry = iter.next
             store.put(entry.key.key(), null, entry.key.window().start())
-            context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
+            entry.value.foreach(keyValue => context.forward(Redirect(keyValue.key, redirect = false), keyValue.value))
           }
           iter.close()
         }
@@ -47,11 +49,11 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
     val before = constraintNode.get.diPredecessors
 
     if (before.isEmpty) {
-      val store = context.getStateStore[WindowStore[L, KeyValue[K, V]]](constraintNode.get.value.name)
-      store.put(link, KeyValue.pair(key, value), context.timestamp())
+      val store = context.getStateStore[WindowStore[L, List[KeyValue[K, V]]]](constraintNode.get.value.name)
+      store.put(link, List(KeyValue.pair(key, value)), context.timestamp())
     } else {
       before.foreach(nodeBefore => {
-        val beforeStore = context.getStateStore[WindowStore[L, KeyValue[K, V]]](nodeBefore.value.name)
+        val beforeStore = context.getStateStore[WindowStore[L, List[KeyValue[K, V]]]](nodeBefore.value.name)
 
         val (before, after) = (nodeBefore.value, constraintNode.get.value)
         val edge = graph.edges.find(e => e.from == before && e.to == after)
@@ -76,27 +78,32 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
             }
           }
         } else {
-          val store = context.getStateStore[WindowStore[L, KeyValue[K, V]]](constraintNode.get.value.name)
+          val store = context.getStateStore[WindowStore[L, List[KeyValue[K, V]]]](constraintNode.get.value.name)
 
           if (!bufferedBeforeIterator.hasNext) {
-            store.put(link, KeyValue.pair(key, value), context.timestamp())
+            store.put(link, List(KeyValue.pair(key, value)), context.timestamp())
           } else {
             label.action match {
               case Swap =>
-                store.put(link, KeyValue.pair(key, value), context.timestamp())
+                val recordList = ListBuffer(KeyValue.pair(key, value))
                 while (!constraint.withFullWindows && bufferedBeforeIterator.hasNext) {
                   val entry = bufferedBeforeIterator.next
                   beforeStore.put(link, null, entry.key)
-                  store.put(link, KeyValue.pair(entry.value.key, entry.value.value), context.timestamp() + 1)
+                  recordList.addAll(entry.value)
                 }
+                store.put(link, recordList.toList, context.timestamp())
+
               case DropBefore =>
                 dropBufferedBefore(bufferedBeforeIterator, beforeStore, link)
-                store.put(link, KeyValue.pair(key, value), context.timestamp())
+                store.put(link, List(KeyValue.pair(key, value)), context.timestamp())
+
               case DropAfter =>
+                val recordList = ListBuffer(KeyValue.pair(key, value))
                 while (!constraint.withFullWindows && bufferedBeforeIterator.hasNext) {
                   val entry = bufferedBeforeIterator.next
                   beforeStore.put(link, null, entry.key)
-                  store.put(link, KeyValue.pair(entry.value.key, entry.value.value), entry.key)
+                  recordList.addAll(entry.value)
+                  store.put(link, recordList.toList, entry.key)
                 }
             }
           }
@@ -115,18 +122,18 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
     constraint.windowConstraints
       .exists(constraint => constraint.before._1(key, value) || constraint.after._1(key, value))
 
-  private def publishBufferedBefore(iterator: WindowStoreIterator[KeyValue[K, V]],
-                                    store: WindowStore[L, KeyValue[K, V]],
+  private def publishBufferedBefore(iterator: WindowStoreIterator[List[KeyValue[K, V]]],
+                                    store: WindowStore[L, List[KeyValue[K, V]]],
                                     link: L): Unit = {
     while (!constraint.withFullWindows && iterator.hasNext) {
       val entry = iterator.next
       store.put(link, null, entry.key)
-      context.forward(Redirect(entry.value.key, redirect = false), entry.value.value)
+      entry.value.foreach(keyValue => context.forward(Redirect(keyValue.key, redirect = false), keyValue.value))
     }
   }
 
-  private def dropBufferedBefore(iterator: WindowStoreIterator[KeyValue[K, V]],
-                                    store: WindowStore[L, KeyValue[K, V]],
+  private def dropBufferedBefore(iterator: WindowStoreIterator[List[KeyValue[K, V]]],
+                                    store: WindowStore[L, List[KeyValue[K, V]]],
                                     link: L): Unit = {
     while (!constraint.withFullWindows && iterator.hasNext) {
       val entry = iterator.next
