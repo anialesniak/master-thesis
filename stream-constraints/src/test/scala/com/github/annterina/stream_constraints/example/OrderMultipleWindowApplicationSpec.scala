@@ -32,9 +32,9 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
       .swap
 
     val cancelledCreatedWindow = new WindowConstraintBuilder[String, OrderEvent]
-      .before((_, e) => e.action == "CANCELLED", "Order Cancelled")
+      .before((_, e) => e.action == "UPDATED", "Order Updated")
       .after((_, e) => e.action == "CREATED", "Order Created")
-      .window(Duration.ofSeconds(5))
+      .window(Duration.ofSeconds(10))
       .swap
 
     val constraints = new ConstraintBuilder[String, OrderEvent, Integer]
@@ -93,24 +93,24 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
     it("should detect multiple before and swap events in the window") {
       val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
       inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
-      inputTopic.pipeInput("456", OrderEvent(1, "CREATED"), timestamp.plusSeconds(1))
-      inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(2))
+      inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(3))
+      inputTopic.pipeInput("789", OrderEvent(1, "CREATED"), timestamp.plusSeconds(6))
 
       val output = outputTopic.readKeyValue()
 
       assert(output.key == "789")
       assert(output.value.key == 1)
-      assert(output.value.action == "UPDATED")
+      assert(output.value.action == "CREATED")
 
       val secondOutput = outputTopic.readKeyValue()
 
-      assert(secondOutput.key == "123")
+      assert(secondOutput.key == "456")
       assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "CANCELLED")
+      assert(secondOutput.value.action == "UPDATED")
 
       val thirdOutput = outputTopic.readKeyValue()
 
-      assert(thirdOutput.key == "456")
+      assert(thirdOutput.key == "789")
       assert(thirdOutput.value.key == 1)
       assert(thirdOutput.value.action == "CANCELLED")
     }
