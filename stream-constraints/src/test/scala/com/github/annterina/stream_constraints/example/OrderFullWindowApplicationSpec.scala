@@ -63,7 +63,7 @@ class OrderFullWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
     testDriver.close()
   }
 
-  describe("Order Terminal Application With Full Windows") {
+  describe("Order Application With Full Windows") {
 
     it("should accept after events for the whole window") {
       val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")

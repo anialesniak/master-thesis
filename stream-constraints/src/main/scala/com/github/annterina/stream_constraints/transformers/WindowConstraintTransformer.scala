@@ -83,7 +83,7 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
         label.action match {
           case Swap =>
             val recordList = ListBuffer(KeyValue.pair(key, value))
-            while (!constraint.withFullWindows && bufferedBeforeIterator.hasNext) { //TODO here remove full windows
+            while (bufferedBeforeIterator.hasNext) { //TODO here remove full windows
               val entry = bufferedBeforeIterator.next
               beforeStore.put(link, null, entry.key)
               recordList.addAll(entry.value)

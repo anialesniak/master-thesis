@@ -63,7 +63,7 @@ class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
     testDriver.close()
   }
 
-  describe("Order Terminal Application") {
+  describe("Order Application") {
 
     it("should detect and swap events in the window") {
       val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")

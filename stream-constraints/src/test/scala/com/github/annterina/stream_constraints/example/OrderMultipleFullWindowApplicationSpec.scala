@@ -12,7 +12,7 @@ import org.apache.kafka.streams.{StreamsConfig, TestInputTopic, TestOutputTopic,
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.funspec.AnyFunSpec
 
-class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
+class OrderMultipleFullWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
 
   private var testDriver: TopologyTestDriver = _
   private var inputTopic: TestInputTopic[String, OrderEvent] = _
@@ -40,6 +40,7 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
     val constraints = new ConstraintBuilder[String, OrderEvent, Integer]
       .windowConstraint(cancelledUpdatedWindow)
       .windowConstraint(cancelledCreatedWindow)
+      .withFullWindows()
       .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
@@ -99,6 +100,9 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
       inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(3))
       inputTopic.pipeInput("789", OrderEvent(1, "CREATED"), timestamp.plusSeconds(6))
 
+      // advances stream time
+      inputTopic.pipeInput("000", OrderEvent(1, "NOT_RELATED"), timestamp.plusSeconds(20))
+
       val output = outputTopic.readKeyValue()
 
       assert(output.key == "789")
@@ -107,15 +111,21 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
 
       val secondOutput = outputTopic.readKeyValue()
 
-      assert(secondOutput.key == "456")
+      assert(secondOutput.key == "000")
       assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "UPDATED")
+      assert(secondOutput.value.action == "NOT_RELATED")
 
       val thirdOutput = outputTopic.readKeyValue()
 
-      assert(thirdOutput.key == "123")
+      assert(thirdOutput.key == "456")
       assert(thirdOutput.value.key == 1)
-      assert(thirdOutput.value.action == "CANCELLED")
+      assert(thirdOutput.value.action == "UPDATED")
+
+      val fourthOutput = outputTopic.readKeyValue()
+
+      assert(fourthOutput.key == "123")
+      assert(fourthOutput.value.key == 1)
+      assert(fourthOutput.value.action == "CANCELLED")
     }
 
     it("should swap events in two windows with multiple events") {
@@ -124,30 +134,28 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
       inputTopic.pipeInput("456", OrderEvent(1, "CANCELLED"), timestamp.plusSeconds(1))
       inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(3))
       inputTopic.pipeInput("000", OrderEvent(1, "CREATED"), timestamp.plusSeconds(6))
+      inputTopic.pipeInput("111", OrderEvent(1, "CREATED"), timestamp.plusSeconds(8))
+
+      // stream time advances
+      inputTopic.pipeInput("222", OrderEvent(1, "NOT_RELATED"), timestamp.plusSeconds(20))
 
       val output = outputTopic.readKeyValue()
-
       assert(output.key == "000")
-      assert(output.value.key == 1)
-      assert(output.value.action == "CREATED")
 
       val secondOutput = outputTopic.readKeyValue()
-
-      assert(secondOutput.key == "789")
-      assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "UPDATED")
+      assert(secondOutput.key == "111")
 
       val thirdOutput = outputTopic.readKeyValue()
-
-      assert(thirdOutput.key == "123")
-      assert(thirdOutput.value.key == 1)
-      assert(thirdOutput.value.action == "CANCELLED")
+      assert(thirdOutput.key == "222")
 
       val fourthOutput = outputTopic.readKeyValue()
+      assert(fourthOutput.key == "789")
 
-      assert(fourthOutput.key == "456")
-      assert(fourthOutput.value.key == 1)
-      assert(fourthOutput.value.action == "CANCELLED")
+      val fifthOutput = outputTopic.readKeyValue()
+      assert(fifthOutput.key == "123")
+
+      val sixthOutput = outputTopic.readKeyValue()
+      assert(sixthOutput.key == "456")
     }
 
     it("should detect one of two possible windows") {
@@ -157,7 +165,6 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
 
       // stream time advances
       inputTopic.pipeInput("789", OrderEvent(1, "NOT_RELATED"), timestamp.plusSeconds(16))
-
       outputTopic.readKeyValue()
 
       val output = outputTopic.readKeyValue()
