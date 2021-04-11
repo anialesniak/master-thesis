@@ -77,6 +77,9 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
       inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
       inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(2))
 
+      // advances stream time
+      inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(13))
+
       val output = outputTopic.readKeyValue()
 
       assert(output.key == "456")
@@ -90,7 +93,7 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
       assert(secondOutput.value.action == "CANCELLED")
     }
 
-    it("should detect multiple before and swap events in the window") {
+    it("should detect swap events in two windows") {
       val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
       inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
       inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(3))
@@ -110,9 +113,64 @@ class OrderMultipleWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterE
 
       val thirdOutput = outputTopic.readKeyValue()
 
-      assert(thirdOutput.key == "789")
+      assert(thirdOutput.key == "123")
       assert(thirdOutput.value.key == 1)
       assert(thirdOutput.value.action == "CANCELLED")
+    }
+
+    it("should swap events in two windows with multiple events") {
+      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
+      inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
+      inputTopic.pipeInput("456", OrderEvent(1, "CANCELLED"), timestamp.plusSeconds(1))
+      inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(3))
+      inputTopic.pipeInput("000", OrderEvent(1, "CREATED"), timestamp.plusSeconds(6))
+
+      val output = outputTopic.readKeyValue()
+
+      assert(output.key == "000")
+      assert(output.value.key == 1)
+      assert(output.value.action == "CREATED")
+
+      val secondOutput = outputTopic.readKeyValue()
+
+      assert(secondOutput.key == "789")
+      assert(secondOutput.value.key == 1)
+      assert(secondOutput.value.action == "UPDATED")
+
+      val thirdOutput = outputTopic.readKeyValue()
+
+      assert(thirdOutput.key == "123")
+      assert(thirdOutput.value.key == 1)
+      assert(thirdOutput.value.action == "CANCELLED")
+
+      val fourthOutput = outputTopic.readKeyValue()
+
+      assert(fourthOutput.key == "456")
+      assert(fourthOutput.value.key == 1)
+      assert(fourthOutput.value.action == "CANCELLED")
+    }
+
+    it("should detect one of two possible windows") {
+      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
+      inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
+      inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(3))
+
+      // stream time advances
+      inputTopic.pipeInput("789", OrderEvent(1, "NOT_RELATED"), timestamp.plusSeconds(16))
+
+      outputTopic.readKeyValue()
+
+      val output = outputTopic.readKeyValue()
+
+      assert(output.key == "456")
+      assert(output.value.key == 1)
+      assert(output.value.action == "UPDATED")
+
+      val secondOutput = outputTopic.readKeyValue()
+
+      assert(secondOutput.key == "123")
+      assert(secondOutput.value.key == 1)
+      assert(secondOutput.value.action == "CANCELLED")
     }
   }
 }

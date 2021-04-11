@@ -208,5 +208,23 @@ class OrderWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
       assert(thirdOutput.value.key == 1)
       assert(thirdOutput.value.action == "UPDATED")
     }
+
+    it("should ignore action when window is not detected") {
+      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
+      inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
+      inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(11))
+
+      val output = outputTopic.readKeyValue()
+
+      assert(output.key == "456")
+      assert(output.value.key == 1)
+      assert(output.value.action == "UPDATED")
+
+      val secondOutput = outputTopic.readKeyValue()
+
+      assert(secondOutput.key == "123")
+      assert(secondOutput.value.key == 1)
+      assert(secondOutput.value.action == "CANCELLED")
+    }
   }
 }

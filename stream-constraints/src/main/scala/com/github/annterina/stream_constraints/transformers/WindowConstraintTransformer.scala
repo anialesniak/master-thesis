@@ -60,20 +60,46 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
 
         val bufferedBeforeIterator = beforeStore.fetch(link, now - label.window.toMillis, now)
 
-        if (!bufferedBeforeIterator.hasNext) {
-          context.forward(Redirect(key, redirect = false), value)
-          return null
-        }
+        if (!constraintNode.get.hasSuccessors) {
+          if (!bufferedBeforeIterator.hasNext) {
+            context.forward(Redirect(key, redirect = false), value)
+          } else {
+            label.action match {
+              case Swap =>
+                context.forward(Redirect(key, redirect = false), value)
+                publishBufferedBefore(bufferedBeforeIterator, beforeStore, link)
+              case DropBefore =>
+                dropBufferedBefore(bufferedBeforeIterator, beforeStore, link)
+                context.forward(Redirect(key, redirect = false), value)
+              case DropAfter =>
+                publishBufferedBefore(bufferedBeforeIterator, beforeStore, link)
+            }
+          }
+        } else {
+          val store = context.getStateStore[WindowStore[L, KeyValue[K, V]]](constraintNode.get.value.name)
 
-        label.action match {
-          case Swap =>
-            context.forward(Redirect(key, redirect = false), value)
-            publishBufferedBefore(bufferedBeforeIterator, beforeStore, link)
-          case DropBefore =>
-            dropBufferedBefore(bufferedBeforeIterator, beforeStore, link)
-            context.forward(Redirect(key, redirect = false), value)
-          case DropAfter =>
-            publishBufferedBefore(bufferedBeforeIterator, beforeStore, link)
+          if (!bufferedBeforeIterator.hasNext) {
+            store.put(link, KeyValue.pair(key, value), context.timestamp())
+          } else {
+            label.action match {
+              case Swap =>
+                store.put(link, KeyValue.pair(key, value), context.timestamp())
+                while (!constraint.withFullWindows && bufferedBeforeIterator.hasNext) {
+                  val entry = bufferedBeforeIterator.next
+                  beforeStore.put(link, null, entry.key)
+                  store.put(link, KeyValue.pair(entry.value.key, entry.value.value), context.timestamp() + 1)
+                }
+              case DropBefore =>
+                dropBufferedBefore(bufferedBeforeIterator, beforeStore, link)
+                store.put(link, KeyValue.pair(key, value), context.timestamp())
+              case DropAfter =>
+                while (!constraint.withFullWindows && bufferedBeforeIterator.hasNext) {
+                  val entry = bufferedBeforeIterator.next
+                  beforeStore.put(link, null, entry.key)
+                  store.put(link, KeyValue.pair(entry.value.key, entry.value.value), entry.key)
+                }
+            }
+          }
         }
 
         bufferedBeforeIterator.close()
@@ -91,7 +117,7 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
 
   private def publishBufferedBefore(iterator: WindowStoreIterator[KeyValue[K, V]],
                                     store: WindowStore[L, KeyValue[K, V]],
-                                    link: L) = {
+                                    link: L): Unit = {
     while (!constraint.withFullWindows && iterator.hasNext) {
       val entry = iterator.next
       store.put(link, null, entry.key)
@@ -101,7 +127,7 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
 
   private def dropBufferedBefore(iterator: WindowStoreIterator[KeyValue[K, V]],
                                     store: WindowStore[L, KeyValue[K, V]],
-                                    link: L) = {
+                                    link: L): Unit = {
     while (!constraint.withFullWindows && iterator.hasNext) {
       val entry = iterator.next
       store.put(link, null, entry.key)
