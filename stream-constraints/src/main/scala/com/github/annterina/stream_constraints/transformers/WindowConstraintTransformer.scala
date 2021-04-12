@@ -22,6 +22,9 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
   override def init(context: ProcessorContext): Unit = {
     this.context = context
 
+    require(noMutuallyExclusivePredecessors(graph),
+      "Window constraints with the same node cannot have mutually exclusive actions.")
+
     constraint.windowConstraints.foreach(constraint => {
       val store = context.getStateStore[WindowStore[L, KeyValueList]](constraint.before._2)
 
@@ -56,6 +59,8 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
       return null
     }
 
+    val allBeforeToPublish = ListBuffer.empty[KeyValue[K, V]]
+
     before.foreach(nodeBefore => {
       val beforeStore = context.getStateStore[WindowStore[L, KeyValueList]](nodeBefore.value.name)
 
@@ -69,13 +74,15 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
       if (!constraintNode.get.hasSuccessors) {
         label.action match {
           case Swap =>
-            context.forward(Redirect(key, redirect = false), value)
-            publishBufferedBefore(bufferedBeforeIterator, beforeStore, link)
+            //context.forward(Redirect(key, redirect = false), value)
+            allBeforeToPublish.addOne(KeyValue.pair(key, value))
+            publishBufferedBefore(bufferedBeforeIterator, beforeStore, link, allBeforeToPublish)
           case DropBefore =>
             dropBufferedBefore(bufferedBeforeIterator, beforeStore, link)
-            context.forward(Redirect(key, redirect = false), value)
+            allBeforeToPublish.addOne(KeyValue.pair(key, value))
+            //context.forward(Redirect(key, redirect = false), value)
           case DropAfter =>
-            publishBufferedBefore(bufferedBeforeIterator, beforeStore, link)
+            publishBufferedBefore(bufferedBeforeIterator, beforeStore, link, allBeforeToPublish)
         }
       } else {
         val store = context.getStateStore[WindowStore[L, KeyValueList]](constraintNode.get.value.name)
@@ -106,6 +113,10 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
       bufferedBeforeIterator.close()
     })
 
+    allBeforeToPublish
+      .distinct
+      .foreach(keyValue => context.forward(Redirect(keyValue.key, redirect = false), keyValue.value))
+
     null
   }
 
@@ -117,11 +128,13 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
 
   private def publishBufferedBefore(iterator: WindowStoreIterator[KeyValueList],
                                     store: WindowStore[L, KeyValueList],
-                                    link: L): Unit = {
+                                    link: L,
+                                    allBeforeToPublish: ListBuffer[KeyValue[K, V]]): Unit = {
     while (!constraint.withFullWindows && iterator.hasNext) {
       val entry = iterator.next
       store.put(link, null, entry.key)
-      entry.value.foreach(keyValue => context.forward(Redirect(keyValue.key, redirect = false), keyValue.value))
+      allBeforeToPublish.addAll(entry.value)
+      //entry.value.foreach(keyValue => context.forward(Redirect(keyValue.key, redirect = false), keyValue.value))
     }
   }
 
@@ -132,5 +145,16 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
       val entry = iterator.next
       store.put(link, null, entry.key)
     }
+  }
+
+  private def noMutuallyExclusivePredecessors(graph: Graph[ConstraintNode, LDiEdge]): Boolean = {
+    graph.nodes.forall(node => {
+      val labels = node.incoming
+        .map(edge => edge.label.asInstanceOf[WindowLabel].action)
+        .toList
+        .distinct
+
+      labels.size <= 1 || labels.equals(List(Swap, DropBefore))
+    })
   }
 }
