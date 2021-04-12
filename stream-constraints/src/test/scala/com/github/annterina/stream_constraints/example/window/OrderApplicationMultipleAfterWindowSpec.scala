@@ -1,4 +1,4 @@
-package com.github.annterina.stream_constraints.example
+package com.github.annterina.stream_constraints.example.window
 
 import java.time.{Duration, Instant}
 import java.util.Properties
@@ -6,13 +6,14 @@ import java.util.Properties
 import com.github.annterina.stream_constraints.CStreamsBuilder
 import com.github.annterina.stream_constraints.constraints.ConstraintBuilder
 import com.github.annterina.stream_constraints.constraints.window.WindowConstraintBuilder
+import com.github.annterina.stream_constraints.example.{OrderEvent, OrderEventSerde}
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.kstream.{Consumed, Produced}
 import org.apache.kafka.streams.{StreamsConfig, TestInputTopic, TestOutputTopic, TopologyTestDriver}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.funspec.AnyFunSpec
 
-class OrderFullWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
+class OrderApplicationMultipleAfterWindowSpec extends AnyFunSpec with BeforeAndAfterEach {
 
   private var testDriver: TopologyTestDriver = _
   private var inputTopic: TestInputTopic[String, OrderEvent] = _
@@ -25,6 +26,12 @@ class OrderFullWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
 
     val orderEventSerde = Serdes.serdeFrom(OrderEventSerde.serializer(), OrderEventSerde.deserializer())
 
+    val cancelledCreatedWindow = new WindowConstraintBuilder[String, OrderEvent]
+      .before((_, e) => e.action == "CANCELLED", "Order Cancelled")
+      .after((_, e) => e.action == "CREATED", "Order Created")
+      .window(Duration.ofSeconds(10))
+      .swap
+
     val cancelledUpdatedWindow = new WindowConstraintBuilder[String, OrderEvent]
       .before((_, e) => e.action == "CANCELLED", "Order Cancelled")
       .after((_, e) => e.action == "UPDATED", "Order Updated")
@@ -32,7 +39,8 @@ class OrderFullWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
       .swap
 
     val constraints = new ConstraintBuilder[String, OrderEvent, Integer]
-      .windowConstraint(cancelledUpdatedWindow).withFullWindows()
+      .windowConstraint(cancelledUpdatedWindow)
+      .windowConstraint(cancelledCreatedWindow)
       .link((_, e) => e.key)(Serdes.Integer)
       .build(Serdes.String, orderEventSerde)
 
@@ -63,17 +71,13 @@ class OrderFullWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
     testDriver.close()
   }
 
-  describe("Order Application With Full Windows") {
+  describe("Order Application with window constraints with multiple after") {
 
-    it("should accept after events for the whole window") {
+    it("should swap events in the window with single before event") {
       val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
       inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp)
       inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(2))
-      inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(4))
-      inputTopic.pipeInput("000", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(6))
-
-      // stream advances to close the window
-      inputTopic.pipeInput("111", OrderEvent(1, "NOT_RELATED"), timestamp.plusSeconds(11))
+      inputTopic.pipeInput("789", OrderEvent(1, "CREATED"), timestamp.plusSeconds(5))
 
       val output = outputTopic.readKeyValue()
 
@@ -83,69 +87,15 @@ class OrderFullWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach 
 
       val secondOutput = outputTopic.readKeyValue()
 
-      assert(secondOutput.key == "789")
+      assert(secondOutput.key == "123")
       assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "UPDATED")
+      assert(secondOutput.value.action == "CANCELLED")
 
       val thirdOutput = outputTopic.readKeyValue()
 
-      assert(thirdOutput.key == "000")
+      assert(thirdOutput.key == "789")
       assert(thirdOutput.value.key == 1)
-      assert(thirdOutput.value.action == "UPDATED")
-
-      // read the message that advances stream time
-      outputTopic.readKeyValue()
-
-      val nextOutput = outputTopic.readKeyValue()
-
-      assert(nextOutput.key == "123")
-      assert(nextOutput.value.key == 1)
-      assert(nextOutput.value.action == "CANCELLED")
-    }
-
-    it("should accept multiple before events and after events for the whole window") {
-      val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")
-      inputTopic.pipeInput("000", OrderEvent(1, "CANCELLED"), timestamp)
-      inputTopic.pipeInput("123", OrderEvent(1, "CANCELLED"), timestamp.plusSeconds(1))
-      inputTopic.pipeInput("456", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(2))
-      inputTopic.pipeInput("789", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(4))
-      inputTopic.pipeInput("111", OrderEvent(1, "UPDATED"), timestamp.plusSeconds(6))
-
-      // stream advances to close the window
-      inputTopic.pipeInput("222", OrderEvent(1, "NOT_RELATED"), timestamp.plusSeconds(11))
-
-      val output = outputTopic.readKeyValue()
-
-      assert(output.key == "456")
-      assert(output.value.key == 1)
-      assert(output.value.action == "UPDATED")
-
-      val secondOutput = outputTopic.readKeyValue()
-
-      assert(secondOutput.key == "789")
-      assert(secondOutput.value.key == 1)
-      assert(secondOutput.value.action == "UPDATED")
-
-      val thirdOutput = outputTopic.readKeyValue()
-
-      assert(thirdOutput.key == "111")
-      assert(thirdOutput.value.key == 1)
-      assert(thirdOutput.value.action == "UPDATED")
-
-      // read the message that advances stream time
-      outputTopic.readKeyValue()
-
-      val firstBefore = outputTopic.readKeyValue()
-
-      assert(firstBefore.key == "000")
-      assert(firstBefore.value.key == 1)
-      assert(firstBefore.value.action == "CANCELLED")
-
-      val secondBefore = outputTopic.readKeyValue()
-
-      assert(secondBefore.key == "123")
-      assert(secondBefore.value.key == 1)
-      assert(secondBefore.value.action == "CANCELLED")
+      assert(thirdOutput.value.action == "CREATED")
     }
   }
 }

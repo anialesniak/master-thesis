@@ -1,4 +1,4 @@
-package com.github.annterina.stream_constraints.example
+package com.github.annterina.stream_constraints.example.window.full
 
 import java.time.{Duration, Instant}
 import java.util.Properties
@@ -6,13 +6,14 @@ import java.util.Properties
 import com.github.annterina.stream_constraints.CStreamsBuilder
 import com.github.annterina.stream_constraints.constraints.ConstraintBuilder
 import com.github.annterina.stream_constraints.constraints.window.WindowConstraintBuilder
+import com.github.annterina.stream_constraints.example.{OrderEvent, OrderEventSerde}
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.kstream.{Consumed, Produced}
 import org.apache.kafka.streams.{StreamsConfig, TestInputTopic, TestOutputTopic, TopologyTestDriver}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.funspec.AnyFunSpec
 
-class OrderMultipleAfterFullWindowApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
+class OrderApplicationMultipleAfterFullWindowSpec extends AnyFunSpec with BeforeAndAfterEach {
 
   private var testDriver: TopologyTestDriver = _
   private var inputTopic: TestInputTopic[String, OrderEvent] = _
@@ -71,7 +72,7 @@ class OrderMultipleAfterFullWindowApplicationSpec extends AnyFunSpec with Before
     testDriver.close()
   }
 
-  describe("Order Application With Multiple Connected Window Constraints") {
+  describe("Order Application with full window constraints with multiple after") {
 
     it("should swap events in the window with single before event in full windows") {
       val timestamp = Instant.parse("2021-03-21T10:15:00.00Z")

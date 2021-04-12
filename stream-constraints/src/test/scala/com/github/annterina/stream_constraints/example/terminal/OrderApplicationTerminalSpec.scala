@@ -1,17 +1,18 @@
-package com.github.annterina.stream_constraints.example
+package com.github.annterina.stream_constraints.example.terminal
 
 import java.time.Instant
 import java.util.Properties
 
 import com.github.annterina.stream_constraints.CStreamsBuilder
 import com.github.annterina.stream_constraints.constraints.ConstraintBuilder
+import com.github.annterina.stream_constraints.example.{OrderEvent, OrderEventSerde}
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.kstream.{Consumed, Produced}
 import org.apache.kafka.streams.{StreamsConfig, TestInputTopic, TestOutputTopic, TopologyTestDriver}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.funspec.AnyFunSpec
 
-class OrderTerminalApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
+class OrderApplicationTerminalSpec extends AnyFunSpec with BeforeAndAfterEach {
 
   private var testDriver: TopologyTestDriver = _
   private var inputTopic: TestInputTopic[String, OrderEvent] = _
@@ -65,7 +66,7 @@ class OrderTerminalApplicationSpec extends AnyFunSpec with BeforeAndAfterEach {
     testDriver.close()
   }
 
-  describe("Order Terminal Application") {
+  describe("Order Application with prerequisite and terminal constraints") {
 
     it("should emit the prerequisite event") {
       inputTopic.pipeInput("123", OrderEvent(1, "CREATED"))
