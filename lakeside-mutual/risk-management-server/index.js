@@ -6,10 +6,18 @@ require('log-timestamp')(() => {
 })
 const nconf = require('nconf')
 const path = require('path')
-const stompit = require('stompit')
 const grpc = require('grpc')
 const DataManager = require('./lib/data-manager')
 const ReportGenerator = require('./lib/report-generator')
+
+const { Kafka } = require('kafkajs')
+
+const kafka = new Kafka({
+  clientId: 'riskmanagement',
+  brokers: ['localhost:9092']
+})
+
+const consumer = kafka.consumer({ groupId: 'riskmanagement-group' })
 
 nconf
   .argv()
@@ -18,84 +26,37 @@ nconf
 
 /*
 The handleMessage() function gets called whenever a new PolicyEvent message is available
-on the message queue. Each message is then persisted with the data manager.
+on the message topic. Each message is then persisted with the data manager.
 */
-function handleMessage(channel, dataManager, error, message, subscription) {
-  if (error) {
-    console.error(`Error: ${error}`)
-    channel.close()
-    return
-  }
-
-  message.readString('utf8', (error, string) => {
-    if (error) {
+function handleMessage(dataManager, message) {
+  const event = JSON.parse(message)
+  console.log('An event has been consumed:')
+  console.log(JSON.stringify(event, null, 4))
+  dataManager.addEvent(event)
+  dataManager
+    .save()
+    .catch(error => {
       console.error(`Error: ${error}`)
-      channel.close()
-      return
-    }
-
-    const event = JSON.parse(string)
-    console.log('An event has been consumed:')
-    console.log(JSON.stringify(event, null, 4))
-    dataManager.addEvent(event)
-    dataManager
-      .save()
-      .then(() => {
-        channel.ack(message)
-      })
-      .catch(error => {
-        console.error(`Error: ${error}`)
-      })
-  })
+    })
 }
 
 /*
-The consumeEvents() function consumes PolicyEvent messages from the message queue when
+The consumeEvents() function consumes PolicyEvent messages from the topic when
 they become available. Each event is then persisted with the data manager.
 */
 function consumeEvents(dataManager) {
-  const mq_config = nconf.get('activemq')
-  console.log(
-    'Starting to consume PolicyEvent messages from: ',
-    mq_config.host,
-    mq_config.port,
-    mq_config.username
-  )
-  const connectOptions = {
-    host: mq_config.host,
-    port: mq_config.port,
-    connectHeaders: {
-      host: '/',
-      login: mq_config.username,
-      passcode: mq_config.password,
-      'heart-beat': '5000,5000',
-    },
+  const run = async () => {
+    await consumer.connect()
+    await consumer.subscribe({ topic: 'newpolicies', fromBeginning: true })
+
+    await consumer.run({
+      eachMessage: async ({ topic, partition, message }) => {
+        handleMessage(dataManager, message.value)
+      },
+    })
   }
 
-  const connectFailover = new stompit.ConnectFailover([connectOptions])
-
-  connectFailover.on('error', error => {
-    const connectArgs = error.connectArgs
-    const address = `${connectArgs.host}:${connectArgs.port}`
-    console.log(`Connection error to ${address}: ${error.message}`)
-  })
-
-  const channelFactory = new stompit.ChannelFactory(connectFailover)
-  channelFactory.channel((error, channel) => {
-    if (error) {
-      console.log('channel factory error: ' + error.message)
-      reject(error)
-      return
-    }
-
-    const subscribeHeaders = {
-      destination: `/queue/${mq_config.queueName}`,
-      ack: 'client-individual',
-    }
-
-    const messageHandler = handleMessage.bind(null, channel, dataManager)
-    channel.subscribe(subscribeHeaders, messageHandler)
-  })
+  run().catch(console.error)
 }
 
 /*

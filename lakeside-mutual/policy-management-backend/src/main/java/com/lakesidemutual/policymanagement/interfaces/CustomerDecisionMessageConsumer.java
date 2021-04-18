@@ -9,8 +9,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jms.annotation.JmsListener;
-import org.springframework.messaging.Message;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import com.lakesidemutual.policymanagement.domain.customer.CustomerId;
@@ -59,10 +58,12 @@ public class CustomerDecisionMessageConsumer {
 	@Autowired
 	private CustomerCoreRemoteProxy customerCoreRemoteProxy;
 
-	@JmsListener(destination = "${customerDecisionEvent.queueName}")
-	public void receiveCustomerDecision(final Message<CustomerDecisionEvent> message) {
-		logger.debug("A new CustomerDecisionEvent has been received.");
-		final CustomerDecisionEvent customerDecisionEvent = message.getPayload();
+	@KafkaListener(topics = "${customerDecisionEvent.topicName}",
+			groupId = "${spring.kafka.consumer.group-id}",
+			containerFactory = "customerDecisionListenerFactory")
+	public void receiveCustomerDecision(final CustomerDecisionEvent customerDecisionEvent) {
+		logger.info("A new CustomerDecisionEvent has been received.");
+
 		final Long id = customerDecisionEvent.getInsuranceQuoteRequestId();
 		final Optional<InsuranceQuoteRequestAggregateRoot> insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
 

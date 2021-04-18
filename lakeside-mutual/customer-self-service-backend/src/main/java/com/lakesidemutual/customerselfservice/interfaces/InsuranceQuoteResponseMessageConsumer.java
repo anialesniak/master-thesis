@@ -6,8 +6,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jms.annotation.JmsListener;
-import org.springframework.messaging.Message;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import com.lakesidemutual.customerselfservice.domain.insurancequoterequest.InsuranceQuoteEntity;
@@ -28,10 +27,12 @@ public class InsuranceQuoteResponseMessageConsumer {
 	@Autowired
 	private InsuranceQuoteRequestRepository insuranceQuoteRequestRepository;
 
-	@JmsListener(destination = "${insuranceQuoteResponseEvent.queueName}")
-	public void receiveInsuranceQuoteResponse(final Message<InsuranceQuoteResponseEvent> message) {
+	@KafkaListener(topics = "${insuranceQuoteResponseEvent.topicName}",
+			groupId = "${spring.kafka.consumer.group-id}",
+			containerFactory = "insuranceQuoteResponseListenerFactory")
+	public void receiveInsuranceQuoteResponse(final InsuranceQuoteResponseEvent insuranceQuoteResponseEvent) {
 		logger.info("A new InsuranceQuoteResponseEvent has been received.");
-		final InsuranceQuoteResponseEvent insuranceQuoteResponseEvent = message.getPayload();
+
 		final Long id = insuranceQuoteResponseEvent.getInsuranceQuoteRequestId();
 		final Optional<InsuranceQuoteRequestAggregateRoot> insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
 

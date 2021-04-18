@@ -2,13 +2,13 @@ package com.lakesidemutual.customerselfservice.infrastructure;
 
 import java.util.Date;
 
+import org.microserviceapipatterns.domaindrivendesign.DomainEvent;
 import org.microserviceapipatterns.domaindrivendesign.InfrastructureService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jms.JmsException;
-import org.springframework.jms.core.JmsTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 import com.lakesidemutual.customerselfservice.domain.insurancequoterequest.CustomerDecisionEvent;
@@ -22,16 +22,16 @@ import com.lakesidemutual.customerselfservice.interfaces.dtos.insurancequoterequ
  * */
 @Component
 public class PolicyManagementMessageProducer implements InfrastructureService {
-	private Logger logger = LoggerFactory.getLogger(this.getClass());
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-	@Value("${insuranceQuoteRequestEvent.queueName}")
-	private String insuranceQuoteRequestEventQueue;
+	@Value("${insuranceQuoteRequestEvent.topicName}")
+	private String insuranceQuoteRequestEventTopic;
 
-	@Value("${customerDecisionEvent.queueName}")
-	private String customerDecisionEventQueue;
+	@Value("${customerDecisionEvent.topicName}")
+	private String customerDecisionEventTopic;
 
 	@Autowired
-	private JmsTemplate jmsTemplate;
+	private KafkaTemplate<String, DomainEvent> kafkaTemplate;
 
 	public void sendInsuranceQuoteRequest(Date date, InsuranceQuoteRequestDto insuranceQuoteRequestDto) {
 		InsuranceQuoteRequestEvent insuranceQuoteRequestEvent = new InsuranceQuoteRequestEvent(date, insuranceQuoteRequestDto);
@@ -45,18 +45,18 @@ public class PolicyManagementMessageProducer implements InfrastructureService {
 
 	private void emitInsuranceQuoteRequestEvent(InsuranceQuoteRequestEvent insuranceQuoteRequestEvent) {
 		try {
-			jmsTemplate.convertAndSend(insuranceQuoteRequestEventQueue, insuranceQuoteRequestEvent);
+			kafkaTemplate.send(insuranceQuoteRequestEventTopic, insuranceQuoteRequestEvent);
 			logger.info("Successfully sent a insurance quote request to the Policy Management backend.");
-		} catch(JmsException exception) {
+		} catch(Exception exception) {
 			logger.error("Failed to send a insurance quote request to the Policy Management backend.", exception);
 		}
 	}
 
 	private void emitCustomerDecisionEvent(CustomerDecisionEvent customerDecisionEvent) {
 		try {
-			jmsTemplate.convertAndSend(customerDecisionEventQueue, customerDecisionEvent);
+			kafkaTemplate.send(customerDecisionEventTopic, customerDecisionEvent);
 			logger.info("Successfully sent a customer decision event to the Policy Management backend.");
-		} catch(JmsException exception) {
+		} catch(Exception exception) {
 			logger.error("Failed to send a customer decision event to the Policy Management backend.", exception);
 		}
 	}

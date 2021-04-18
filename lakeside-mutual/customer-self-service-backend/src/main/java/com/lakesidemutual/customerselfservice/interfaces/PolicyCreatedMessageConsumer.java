@@ -5,8 +5,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jms.annotation.JmsListener;
-import org.springframework.messaging.Message;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import com.lakesidemutual.customerselfservice.domain.insurancequoterequest.InsuranceQuoteRequestAggregateRoot;
@@ -25,10 +24,12 @@ public class PolicyCreatedMessageConsumer {
 	@Autowired
 	private InsuranceQuoteRequestRepository insuranceQuoteRequestRepository;
 
-	@JmsListener(destination = "${policyCreatedEvent.queueName}")
-	public void receivePolicyCreatedEvent(final Message<PolicyCreatedEvent> message) {
+	@KafkaListener(topics = "${policyCreatedEvent.topicName}",
+			groupId = "${spring.kafka.consumer.group-id}",
+			containerFactory = "policyCreatedListenerFactory")
+	public void receivePolicyCreatedEvent(final PolicyCreatedEvent policyCreatedEvent) {
 		logger.info("A new PolicyCreatedEvent has been received.");
-		final PolicyCreatedEvent policyCreatedEvent = message.getPayload();
+		
 		final Long id = policyCreatedEvent.getInsuranceQuoteRequestId();
 		final Optional<InsuranceQuoteRequestAggregateRoot> insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
 
