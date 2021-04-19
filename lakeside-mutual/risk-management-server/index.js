@@ -47,7 +47,7 @@ they become available. Each event is then persisted with the data manager.
 function consumeEvents(dataManager) {
   const run = async () => {
     await consumer.connect()
-    await consumer.subscribe({ topic: 'newpolicies', fromBeginning: true })
+    await consumer.subscribe({ topic: 'policy-events', fromBeginning: false })
 
     await consumer.run({
       eachMessage: async ({ topic, partition, message }) => {

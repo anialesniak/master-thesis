@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
@@ -111,7 +112,7 @@ public class PolicyInformationHolder {
 	public ResponseEntity<PolicyDto> updatePolicy(
 			@ApiParam(value = "the policy's unique id", required = true) @PathVariable PolicyId policyId,
 			@ApiParam(value = "the updated policy", required = true) @Valid @RequestBody CreatePolicyRequestDto createPolicyDto,
-			HttpServletRequest request) {
+			HttpServletRequest request) throws InterruptedException {
 		logger.info("Updating policy with id '{}'", policyId.getId());
 
 		Optional<PolicyAggregateRoot> optPolicy = policyRepository.findById(policyId);
@@ -148,6 +149,9 @@ public class PolicyInformationHolder {
 		CustomerDto customer = customers.get(0);
 		PolicyDto policyDto = createPolicyDtos(Arrays.asList(policy), "").get(0);
 		final UpdatePolicyEvent event = new UpdatePolicyEvent(request.getRemoteAddr(), new Date(), customer, policyDto);
+
+		TimeUnit.SECONDS.sleep(5);
+
 		riskManagementMessageProducer.emitEvent(event);
 
 		PolicyDto response = createPolicyDtos(Arrays.asList(policy), "").get(0);
@@ -158,7 +162,10 @@ public class PolicyInformationHolder {
 	@DeleteMapping(value = "/{policyId}")
 	public ResponseEntity<Void> deletePolicy(
 			@ApiParam(value = "the policy's unique id", required = true) @PathVariable PolicyId policyId,
-			HttpServletRequest request) {
+			HttpServletRequest request) throws InterruptedException {
+
+		TimeUnit.SECONDS.sleep(5);
+
 		logger.info("Deleting policy with id '{}'", policyId.getId());
 		policyRepository.deleteById(policyId);
 
