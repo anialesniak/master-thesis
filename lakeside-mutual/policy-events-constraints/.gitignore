@@ -1,0 +1,20 @@
+project/target
+project/project
+target/
+.idea/
+.idea_modules/
+*.DS_Store
+
+### SBT ###
+dist/*
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+.history
+.cache
+.lib/
+
+### Scala ###
+*.class
+*.log
