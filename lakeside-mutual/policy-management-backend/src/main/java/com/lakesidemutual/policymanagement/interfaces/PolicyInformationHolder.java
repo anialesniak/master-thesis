@@ -103,7 +103,7 @@ public class PolicyInformationHolder {
 		CustomerDto customer = customers.get(0);
 		PolicyDto policyDto = createPolicyDtos(Arrays.asList(policy), "").get(0);
 		final UpdatePolicyEvent event = new UpdatePolicyEvent(request.getRemoteAddr(), new Date(), customer, policyDto);
-		riskManagementMessageProducer.emitEvent(event);
+		riskManagementMessageProducer.emitEvent(event.getPolicy().getPolicyId(), event);
 		return ResponseEntity.ok(policyDto);
 	}
 
@@ -152,7 +152,7 @@ public class PolicyInformationHolder {
 
 		TimeUnit.SECONDS.sleep(5);
 
-		riskManagementMessageProducer.emitEvent(event);
+		riskManagementMessageProducer.emitEvent(event.getPolicy().getPolicyId(), event);
 
 		PolicyDto response = createPolicyDtos(Arrays.asList(policy), "").get(0);
 		return ResponseEntity.ok(response);
@@ -170,7 +170,7 @@ public class PolicyInformationHolder {
 		policyRepository.deleteById(policyId);
 
 		final DeletePolicyEvent event = new DeletePolicyEvent(request.getRemoteAddr(), new Date(), policyId.getId());
-		riskManagementMessageProducer.emitEvent(event);
+		riskManagementMessageProducer.emitEvent(event.getPolicyId(), event);
 
 		return ResponseEntity.noContent().build();
 	}

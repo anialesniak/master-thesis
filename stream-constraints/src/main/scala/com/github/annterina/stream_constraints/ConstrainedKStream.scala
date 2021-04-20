@@ -49,7 +49,7 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
 
     val windowStateStores = constraint.windowConstraints
       .foldLeft(mutable.Set.empty[String])((stores, windowConstraint) => {
-        val name = windowConstraint.before._2
+        val name = windowConstraint.before._2 ++ "-window"
         if (!stores.contains(name)) {
           stores.add(name)
           builder.addStateStore(storeProvider.windowedStore(name, windowConstraint.window))

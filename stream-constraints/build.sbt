@@ -1,11 +1,11 @@
 name := "stream-constraints"
-
-version := "0.1.0"
+organization := "com.github.annterina"
+version := "0.3.0"
 
 scalaVersion := "2.13.4"
 
 resolvers ++= Seq(
-  "confluent"           at "https://packages.confluent.io/maven/"
+  "confluent" at "https://packages.confluent.io/maven/"
 )
 
 val kafkaStreamsDependencies = Seq(

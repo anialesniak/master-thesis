@@ -16,6 +16,4 @@ object OrderEventSerde extends Serde[OrderEvent]  {
   override def deserializer(): Deserializer[OrderEvent] = (topic: String, data: Array[Byte]) => {
     mapper.readValue(data, classOf[OrderEvent])
   }
-
-
 }

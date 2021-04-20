@@ -110,7 +110,7 @@ public class CustomerDecisionMessageConsumer {
 					CustomerDto customer = customers.get(0);
 					final PolicyDto policyDto = PolicyDto.fromDomainObject(policy);
 					final UpdatePolicyEvent event = new UpdatePolicyEvent("<customer-self-service-backend>", decisionDate, customer, policyDto);
-					riskManagementMessageProducer.emitEvent(event);
+					riskManagementMessageProducer.emitEvent(event.getPolicy().getPolicyId(), event);
 				}
 			}
 		} else {

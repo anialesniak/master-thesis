@@ -29,7 +29,8 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
       "Window constraints with the same node cannot have mutually exclusive actions.")
 
     constraint.windowConstraints.foreach(constraint => {
-      val store = context.getStateStore[WindowStore[L, KeyValueList]](constraint.before._2)
+      val storeName = constraint.before._2 ++ "-window"
+      val store = context.getStateStore[WindowStore[L, KeyValueList]](storeName)
 
       this.context.schedule(constraint.window.dividedBy(2), PunctuationType.STREAM_TIME, new Punctuator {
         override def punctuate(timestamp: Long): Unit = {
@@ -57,7 +58,8 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
     val before = constraintNode.get.diPredecessors
 
     if (before.isEmpty) {
-      val store = context.getStateStore[WindowStore[L, KeyValueList]](constraintNode.get.value.name)
+      val storeName = constraintNode.get.value.name ++ "-window"
+      val store = context.getStateStore[WindowStore[L, KeyValueList]](storeName)
       store.put(link, List(KeyValue.pair(key, value)), context.timestamp())
       return null
     }
@@ -66,7 +68,8 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
     var currentToPublish: Option[KeyValue[K, V]] = None
 
     before.foreach(nodeBefore => {
-      val beforeStore = context.getStateStore[WindowStore[L, KeyValueList]](nodeBefore.value.name)
+      val storeName = nodeBefore.value.name ++ "-window"
+      val beforeStore = context.getStateStore[WindowStore[L, KeyValueList]](storeName)
 
       val (before, after) = (nodeBefore.value, constraintNode.get.value)
       val edge = graph.edges.find(e => e.from == before && e.to == after)
@@ -79,17 +82,16 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
         label.action match {
           case Swap =>
             currentToPublish = Some(KeyValue.pair(key, value))
-            //allBeforeToPublish.addOne(ValueAndTimestamp.make(KeyValue.pair(key, value), context.timestamp()))
             publishBufferedBefore(bufferedBeforeIterator, beforeStore, link, allBeforeToPublish)
           case DropBefore =>
             dropBufferedBefore(bufferedBeforeIterator, beforeStore, link)
             currentToPublish = Some(KeyValue.pair(key, value))
-            //allBeforeToPublish.addOne(ValueAndTimestamp.make(KeyValue.pair(key, value), context.timestamp()))
           case DropAfter =>
             publishBufferedBefore(bufferedBeforeIterator, beforeStore, link, allBeforeToPublish)
         }
       } else {
-        val store = context.getStateStore[WindowStore[L, KeyValueList]](constraintNode.get.value.name)
+        val storeName = constraintNode.get.value.name ++ "-window"
+        val store = context.getStateStore[WindowStore[L, KeyValueList]](storeName)
 
         label.action match {
           case Swap =>
