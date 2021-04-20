@@ -41,6 +41,8 @@ module.exports = class DataManager {
   async save() {
     return new Promise((resolve, reject) => {
       const content = JSON.stringify(this.data)
+      console.log("Saving the data: ")
+      console.log(content)
       fs.writeFile(dataFilePath, content, error => {
         if (error) {
           reject(error)
