@@ -36,7 +36,7 @@ public class CustomerSelfServiceMessageProducer implements InfrastructureService
 
 	public void sendInsuranceQuoteResponseEvent(InsuranceQuoteResponseEvent event) {
 		try {
-			kafkaTemplate.send(quoteResponseTopic, event);
+			kafkaTemplate.send(quoteResponseTopic, event.getInsuranceQuoteRequestId().toString(), event);
 			logger.info("Successfully sent an insurance quote response to the Customer Self-Service backend.");
 		} catch(Exception exception) {
 			logger.error("Failed to send an insurance quote response to the Customer Self-Service backend.", exception);
@@ -45,7 +45,7 @@ public class CustomerSelfServiceMessageProducer implements InfrastructureService
 
 	public void sendInsuranceQuoteExpiredEvent(InsuranceQuoteExpiredEvent event) {
 		try {
-			kafkaTemplate.send(quoteExpiredTopic, event);
+			kafkaTemplate.send(quoteExpiredTopic, event.getInsuranceQuoteRequestId().toString(), event);
 			logger.info("Successfully sent an insurance quote expired event to the Customer Self-Service backend.");
 		} catch(Exception exception) {
 			logger.error("Failed to send an insurance quote expired event to the Customer Self-Service backend.", exception);
@@ -54,7 +54,7 @@ public class CustomerSelfServiceMessageProducer implements InfrastructureService
 
 	public void sendPolicyCreatedEvent(PolicyCreatedEvent event) {
 		try {
-			kafkaTemplate.send(policyCreatedTopic, event);
+			kafkaTemplate.send(policyCreatedTopic, event.getInsuranceQuoteRequestId().toString(), event);
 			logger.info("Successfully sent an policy created event to the Customer Self-Service backend.");
 		} catch(Exception exception) {
 			logger.error("Failed to send an policy created event to the Customer Self-Service backend.", exception);

@@ -93,6 +93,10 @@ public class CustomerDecisionMessageConsumer {
 				InsuranceQuoteExpiredEvent event = new InsuranceQuoteExpiredEvent(expirationDate, insuranceQuoteRequest.getId());
 				customerSelfServiceMessageProducer.sendInsuranceQuoteExpiredEvent(event);
 			} else {
+
+				// Expired event produced
+				// Stream: expired ---- policy created
+
 				logger.info("The insurance quote for request {} has been accepted", insuranceQuoteRequest.getId());
 				insuranceQuoteRequest.acceptQuote(decisionDate);
 				PolicyAggregateRoot policy = createPolicyForInsuranceQuoteRequest(insuranceQuoteRequest);

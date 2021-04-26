@@ -12,6 +12,10 @@ class CStreamsBuilder  {
     new ConstrainedKStream[K, V, L](builder.stream(topic), builder)
   }
 
+  def stream[K, V, L](topics: Set[String])(implicit consumed: Consumed[K, V]): ConstrainedKStream[K, V, L] = {
+    new ConstrainedKStream[K, V, L](builder.stream(topics), builder)
+  }
+
   def build(): Topology = {
     builder.build()
   }
