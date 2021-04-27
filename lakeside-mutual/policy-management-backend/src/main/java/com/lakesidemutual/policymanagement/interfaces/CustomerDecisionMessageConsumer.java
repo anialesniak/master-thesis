@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +62,7 @@ public class CustomerDecisionMessageConsumer {
 	@KafkaListener(topics = "${customerDecisionEvent.topicName}",
 			groupId = "${spring.kafka.consumer.group-id}",
 			containerFactory = "customerDecisionListenerFactory")
-	public void receiveCustomerDecision(final CustomerDecisionEvent customerDecisionEvent) {
+	public void receiveCustomerDecision(final CustomerDecisionEvent customerDecisionEvent) throws InterruptedException {
 		logger.info("A new CustomerDecisionEvent has been received.");
 
 		final Long id = customerDecisionEvent.getInsuranceQuoteRequestId();
@@ -94,8 +95,7 @@ public class CustomerDecisionMessageConsumer {
 				customerSelfServiceMessageProducer.sendInsuranceQuoteExpiredEvent(event);
 			} else {
 
-				// Expired event produced
-				// Stream: expired ---- policy created
+				TimeUnit.SECONDS.sleep(20);
 
 				logger.info("The insurance quote for request {} has been accepted", insuranceQuoteRequest.getId());
 				insuranceQuoteRequest.acceptQuote(decisionDate);

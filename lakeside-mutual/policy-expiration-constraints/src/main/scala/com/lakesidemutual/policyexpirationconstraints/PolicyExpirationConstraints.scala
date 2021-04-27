@@ -28,7 +28,7 @@ object PolicyExpirationConstraints extends App {
     .before(((_, e) => e.isInstanceOf[InsuranceQuoteExpiredEvent], "insurance-expired"))
     .after(((_, e) => e.isInstanceOf[PolicyCreatedEvent], "policy-created"))
     .window(Duration.ofSeconds(20))
-    .swap
+    .dropBefore
 
   val constraint = new ConstraintBuilder[String, InsuranceQuoteEvent, java.lang.Long]
     .windowConstraint(windowConstraint)

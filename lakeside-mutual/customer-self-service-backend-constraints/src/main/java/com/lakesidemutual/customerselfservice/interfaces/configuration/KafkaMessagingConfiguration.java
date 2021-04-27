@@ -1,15 +1,14 @@
-package com.lakesidemutual.policymanagement.interfaces.configuration;
-
-import java.util.HashMap;
-import java.util.Map;
+package com.lakesidemutual.customerselfservice.interfaces.configuration;
 
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
 import org.springframework.kafka.core.KafkaAdmin;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * The MessagingConfiguration class configures the Kafka message broker. This broker is used
@@ -21,8 +20,11 @@ public class KafkaMessagingConfiguration {
 	@Value(value = "${spring.kafka.bootstrap-servers}")
 	private String bootstrapServers;
 
-	@Value(value = "${insuranceQuoteExpiredEvent.topicName}")
-	private String insuranceQuoteExpiredTopic;
+	@Value("${insuranceQuoteRequestEvent.topicName}")
+	private String insuranceQuoteRequestEventTopic;
+
+	@Value("${customerDecisionEvent.topicName}")
+	private String customerDecisionEventTopic;
 
 	@Bean
 	public KafkaAdmin kafkaAdmin() {
@@ -32,7 +34,12 @@ public class KafkaMessagingConfiguration {
 	}
 
 	@Bean
-	public NewTopic insuranceQuoteExpirationTopic() {
-		return new NewTopic(insuranceQuoteExpiredTopic, 1, (short) 1);
+	public NewTopic insuranceQuoteRequestTopic() {
+		return new NewTopic(insuranceQuoteRequestEventTopic, 1, (short) 1);
+	}
+
+	@Bean
+	public NewTopic customerDecisionTopic() {
+		return new NewTopic(customerDecisionEventTopic, 1, (short) 1);
 	}
 }

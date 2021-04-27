@@ -1,7 +1,4 @@
-package com.lakesidemutual.policyexpirationconstraints;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonTypeName;
+package com.lakesidemutual.customerselfservice.domain.insurancequoterequest;
 
 import java.util.Date;
 
@@ -12,9 +9,6 @@ import java.util.Date;
 public class PolicyCreatedEvent extends InsuranceQuoteEvent {
 	private Date date;
 	private String policyId;
-
-	@JsonProperty("$type")
-	private final String type = "PolicyCreatedEvent";
 
 	public PolicyCreatedEvent() {
 	}
