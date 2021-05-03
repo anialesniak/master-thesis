@@ -10,6 +10,8 @@ libraryDependencies ++= Seq(
   "org.apache.kafka"             %%   "kafka-streams-scala"        %   "2.7.0",
   "org.apache.kafka"              %   "kafka-clients"              %   "2.7.0",
 
+
+  "org.springframework.hateoas"   %   "spring-hateoas"             %   "1.3.0",
   "org.microservice-api-patterns" %   "domaindrivendesign-library" %   "0.2.4",
 
   "org.scalatest"                %%   "scalatest"                  %   "3.2.2" % Test,

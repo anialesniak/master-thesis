@@ -24,6 +24,9 @@ public class KafkaMessagingConfiguration {
 	@Value(value = "${insuranceQuoteExpiredEvent.topicName}")
 	private String insuranceQuoteExpiredTopic;
 
+	@Value(value = "${policyCreatedEvent.topicName}")
+	private String policyCreatedTopic;
+
 	@Bean
 	public KafkaAdmin kafkaAdmin() {
 		Map<String, Object> configs = new HashMap<>();
@@ -35,4 +38,10 @@ public class KafkaMessagingConfiguration {
 	public NewTopic insuranceQuoteExpirationTopic() {
 		return new NewTopic(insuranceQuoteExpiredTopic, 1, (short) 1);
 	}
+
+	@Bean
+	public NewTopic policyCreationTopic() {
+		return new NewTopic(policyCreatedTopic, 1, (short) 1);
+	}
+
 }

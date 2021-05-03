@@ -17,6 +17,7 @@ object PolicyEventsConstraints extends App {
     val properties = new Properties()
     properties.put(StreamsConfig.APPLICATION_ID_CONFIG, "policy-events-constraints-application")
     properties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
+    properties.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG")
     properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest")
     properties
   }
@@ -26,7 +27,7 @@ object PolicyEventsConstraints extends App {
   val windowConstraint = new WindowConstraintBuilder[String, PolicyDomainEvent]
     .before(((_, e) => e.`type` == "DeletePolicyEvent", "policy-deleted"))
     .after(((_, e) => e.`type` == "UpdatePolicyEvent", "policy-updated"))
-    .window(Duration.ofSeconds(20))
+    .window(Duration.ofSeconds(1))
     .swap
 
   val constraint = new ConstraintBuilder[String, PolicyDomainEvent, String]

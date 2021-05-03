@@ -17,6 +17,7 @@ object PolicyExpirationConstraints extends App {
     val properties = new Properties()
     properties.put(StreamsConfig.APPLICATION_ID_CONFIG, "policy-expiration-constraints-application")
     properties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
+    properties.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG")
     properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest")
     properties
   }
@@ -25,9 +26,9 @@ object PolicyExpirationConstraints extends App {
     InsuranceQuoteEventSerde.deserializer())
 
   val windowConstraint = new WindowConstraintBuilder[String, InsuranceQuoteEvent]
-    .before(((_, e) => e.isInstanceOf[InsuranceQuoteExpiredEvent], "insurance-expired"))
+    .before(((_, e) => e.isInstanceOf[InsuranceQuoteExpiredEvent], "insurance-quote-expired"))
     .after(((_, e) => e.isInstanceOf[PolicyCreatedEvent], "policy-created"))
-    .window(Duration.ofSeconds(20))
+    .window(Duration.ofSeconds(5))
     .dropBefore
 
   val constraint = new ConstraintBuilder[String, InsuranceQuoteEvent, java.lang.Long]

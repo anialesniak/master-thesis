@@ -13,7 +13,9 @@ import scalax.collection.{Graph => ImGraph}
 object GraphVisualization {
 
   private val root = DotRootGraph(directed = true, id = Some(Id("Constraints")),
-    attrStmts = List(DotAttrStmt(Elem.node, List(DotAttr(Id("shape"), Id("circle"))))))
+    attrStmts = List(DotAttrStmt(Elem.node, List(
+      DotAttr(Id("shape"), Id("circle")),
+      DotAttr(Id("fontname"), Id("monospace"))))))
 
   def visualize(windowGraph: Graph[ConstraintNode, LDiEdge], graph: Graph[ConstraintNode, DiEdge]): File = {
     val prerequisiteConstraints = graph.toDot(root, diEdgeTransformer, cNodeTransformer = Some(nodeTransformer),
