@@ -25,3 +25,10 @@ libraryDependencies ++= kafkaStreamsDependencies ++ Seq(
   "guru.nidi"                    %      "graphviz-java"               %   "0.18.1",
   "net.liftweb"                  %%     "lift-json"                   %   "3.4.3"
 )
+
+test in assembly := {}
+assemblyMergeStrategy in assembly := {
+  case "BUILD"                       => MergeStrategy.discard
+  case "module-info.class"           => MergeStrategy.discard
+  case other                         => MergeStrategy.defaultMergeStrategy(other)
+}
