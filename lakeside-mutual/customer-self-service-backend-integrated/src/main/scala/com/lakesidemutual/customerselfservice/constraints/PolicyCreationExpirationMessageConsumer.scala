@@ -11,7 +11,6 @@ import com.lakesidemutual.customerselfservice.domain.insurancequoterequest.{Insu
 import com.lakesidemutual.customerselfservice.infrastructure.InsuranceQuoteRequestRepository
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{Serde, Serdes}
-import org.apache.kafka.streams.scala.StreamsBuilder
 import org.apache.kafka.streams.{KafkaStreams, StreamsConfig, Topology}
 import org.apache.kafka.streams.scala.kstream.Consumed
 import org.slf4j.{Logger, LoggerFactory}
@@ -58,14 +57,12 @@ class PolicyCreationExpirationMessageConsumer {
       .link((_, e) => e.getInsuranceQuoteRequestId)(Serdes.Long)
       .build(Serdes.String, insuranceQuoteEventSerde)
 
-    val builder = new StreamsBuilder()
+    val builder = new CStreamsBuilder()
 
     builder
       .stream("insurance-quote-expired-events")(Consumed.`with`(Serdes.String, insuranceQuoteEventSerde))
+      .constrain(constraint)
       .foreach((_, event) => handleEvent(event))
-
-//      .constrain(constraint)
-//      .foreach((_, event) => handleEvent(event))
 
     val topology: Topology = builder.build()
 

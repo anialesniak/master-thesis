@@ -38,7 +38,6 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
     builder.addStateStore(graphs)
     constraintStateStores.add(graphs.name)
 
-
     val terminated = storeProvider.terminatedStore()
     builder.addStateStore(terminated)
     constraintStateStores.add(terminated.name)
@@ -76,6 +75,9 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
 
   def filter(predicate: (K, V) => Boolean): ConstrainedKStream[K, V, L] =
     new ConstrainedKStream(inner.filter(predicate), builder)
+
+  def foreach(action: (K, V) => Unit): Unit =
+    inner.foreach(action)
 
   def to(topic: String)(implicit produced: Produced[K, V]): Unit =
     inner.to(topic)(produced)

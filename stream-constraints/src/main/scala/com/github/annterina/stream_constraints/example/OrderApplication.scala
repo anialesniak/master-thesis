@@ -26,8 +26,8 @@ object OrderApplication extends App {
   val orderEventSerde = Serdes.serdeFrom(OrderEventSerde.serializer(), OrderEventSerde.deserializer())
 
   val constraint = new ConstraintBuilder[String, OrderEvent, Integer]
-    .prerequisite(((_, e) => e.action == "CREATED", "Order Created"),
-      ((_, e) => e.action == "UPDATED", "Order Updated"))
+    .prerequisite(((_, e) => e.action == "CREATED", "order-created"),
+      ((_, e) => e.action == "UPDATED", "order-updated"))
     .link((_, e) => e.key)(Serdes.Integer)
     .build(Serdes.String, orderEventSerde)
 

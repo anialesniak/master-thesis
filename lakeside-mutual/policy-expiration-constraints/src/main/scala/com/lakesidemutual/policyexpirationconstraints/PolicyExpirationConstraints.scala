@@ -9,7 +9,7 @@ import com.github.annterina.stream_constraints.constraints.window.WindowConstrai
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.scala.kstream.{Consumed, Produced}
-import org.apache.kafka.streams.{KafkaStreams, StreamsConfig, Topology}
+import org.apache.kafka.streams.{KafkaStreams, StreamsBuilder, StreamsConfig, Topology}
 
 object PolicyExpirationConstraints extends App {
 
