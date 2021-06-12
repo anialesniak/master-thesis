@@ -24,9 +24,10 @@ object InsuranceQuoteEventSerde extends Serde[InsuranceQuoteEvent] {
       case _ =>
         val event = mapper.readValue(data, classOf[PolicyCreatedEvent])
         if (event.getPolicyId == null) {
-          new InsuranceQuoteExpiredEvent(event.getDate, event.getInsuranceQuoteRequestId)
+          mapper.readValue(data, classOf[InsuranceQuoteExpiredEvent])
+        } else {
+          event
         }
-        event
     }
   }
 }

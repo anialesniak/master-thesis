@@ -1,7 +1,9 @@
 package com.lakesidemutual.customerselfservice.domain.insurancequoterequest;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.microserviceapipatterns.domaindrivendesign.DomainEvent;
 
+@JsonIgnoreProperties(value = { "$type" })
 public class InsuranceQuoteEvent implements DomainEvent {
     private Long insuranceQuoteRequestId;
 

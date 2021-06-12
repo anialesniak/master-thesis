@@ -27,14 +27,14 @@ class OrderApplicationChainWindowsSpec extends AnyFunSpec with BeforeAndAfterEac
     val orderEventSerde = Serdes.serdeFrom(OrderEventSerde.serializer(), OrderEventSerde.deserializer())
 
     val cancelledUpdatedWindow = new WindowConstraintBuilder[String, OrderEvent]
-      .before((_, e) => e.action == "CANCELLED", "Order Cancelled")
-      .after((_, e) => e.action == "UPDATED", "Order Updated")
+      .before((_, e) => e.action == "CANCELLED", "order-cancelled")
+      .after((_, e) => e.action == "UPDATED", "order-updated")
       .window(Duration.ofSeconds(10))
       .swap
 
     val cancelledCreatedWindow = new WindowConstraintBuilder[String, OrderEvent]
-      .before((_, e) => e.action == "UPDATED", "Order Updated")
-      .after((_, e) => e.action == "CREATED", "Order Created")
+      .before((_, e) => e.action == "UPDATED", "order-updated")
+      .after((_, e) => e.action == "CREATED", "order-created")
       .window(Duration.ofSeconds(10))
       .swap
 

@@ -35,6 +35,7 @@ object OrderApplication extends App {
 
   builder
     .stream("orders")(Consumed.`with`(Serdes.String, orderEventSerde))
+    .selectKey((_, value) => value.key.toString)
     .constrain(constraint)
     .to("orders-output-topic")(Produced.`with`(Serdes.String, orderEventSerde))
 

@@ -20,17 +20,13 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
 
     val storeProvider = PrerequisiteStores(constraint)
 
-    // TODO here we probably only need to add the store for "before"
     val constraintStateStores = constraint.prerequisites
       .foldLeft(mutable.Set.empty[String])((stores, prerequisite) => {
-        Seq(prerequisite.before._2, prerequisite.after._2)
-          .foreach(name => {
-            if (!stores.contains(name)) {
-              stores.add(name)
-              builder.addStateStore(storeProvider.bufferStore(name))
-            }
-        })
-
+        val name = prerequisite.after._2
+        if (!stores.contains(name)) {
+          stores.add(name)
+          builder.addStateStore(storeProvider.bufferStore(name))
+        }
         stores
       })
 
@@ -56,7 +52,6 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
         stores
       })
 
-    //if (constraint.windowConstraints.nonEmpty)
     val windowStream = inner
       .transform(() => new WindowConstraintTransformer(constraint, constraintGraph), windowStateStores.toList:_*)
 
@@ -75,6 +70,9 @@ class ConstrainedKStream[K, V, L](inner: KStream[K, V], builder: StreamsBuilder)
 
   def filter(predicate: (K, V) => Boolean): ConstrainedKStream[K, V, L] =
     new ConstrainedKStream(inner.filter(predicate), builder)
+
+  def selectKey[KR](mapper: (K, V) => KR): ConstrainedKStream[KR, V, L] =
+    new ConstrainedKStream(inner.selectKey(mapper), builder)
 
   def foreach(action: (K, V) => Unit): Unit =
     inner.foreach(action)

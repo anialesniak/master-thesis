@@ -33,16 +33,16 @@ class StateConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], graph
   override def transform(key: K, value: V): KeyValue[Redirect[K], V] = {
     val link = constraint.link.apply(key, value)
 
-    // check if the process for this link is terminated
-    if (Option(terminatedStore.get(link)).isDefined) {
-      context.forward(Redirect(key, redirect = true), value)
-      return null
-    }
-
     // check if there is ANY prerequisite constraint specified for this event
     // TODO add terminals here
     if (constraintsNotApplicable(constraint, key, value)) {
       context.forward(Redirect(key, redirect = false), value)
+      return null
+    }
+
+    // check if the process for this link is terminated
+    if (Option(terminatedStore.get(link)).isDefined) {
+      context.forward(Redirect(key, redirect = true), value)
       return null
     }
 

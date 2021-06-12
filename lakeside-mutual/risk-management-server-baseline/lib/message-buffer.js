@@ -1,4 +1,5 @@
 const _ = require('lodash')
+const fs = require('fs')
 
 const DataManager = require('./data-manager')
 const dataManager = new DataManager()
@@ -11,9 +12,10 @@ module.exports = class MessageBuffer {
   }
 
   handleEvent(event) {
-    console.log('An event has been consumed:')
-    console.log(JSON.stringify(event, null, 4))
-    dataManager.addEvent(event)
+    const line = `${event.value.originator} ${event.value.date} ${new Date().getTime()} ${event.key} ${event.value.kind} \n`
+    fs.appendFile('received-events-baseline.txt', line, function (err) {})
+
+    dataManager.addEvent(event.value)
     dataManager
       .save()
       .catch(error => {
@@ -22,15 +24,18 @@ module.exports = class MessageBuffer {
   }
 
   publishFromBuffer() {
-    console.log("Publish has been initiated.")
+    console.log(`Publish has been initiated with ${this.messageQueue.length} messages`)
     const messages = this.messageQueue
     this.messageQueue = []
 
     const events = _.chain(messages)
       .groupBy(message => message.key)
       .values()
-      .flatMap(array => _.sortBy(array, (message) => this.order.indexOf(message.value.kind)))
-      .map(message => message.value)
+      .flatMap(array => {
+        const sorted = _.sortBy(array, (message) => this.order.indexOf(message.value.kind))
+        const index = sorted.findIndex(event => event.value.kind === "DeletePolicyEvent")
+        return sorted.slice(0, index !== -1 ? index + 1 : array.length)
+      })
       .value()
 
     events.forEach(event => this.handleEvent(event))

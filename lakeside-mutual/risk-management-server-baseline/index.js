@@ -104,7 +104,7 @@ process.on('unhandledRejection', err => {
 })
 
 const order = [ 'UpdatePolicyEvent', 'DeletePolicyEvent' ]
-const buffer = new MessageBuffer(order, 10000)
+const buffer = new MessageBuffer(order, 1000)
 consumeEvents(buffer)
 
 startGRPCServer(new DataManager())

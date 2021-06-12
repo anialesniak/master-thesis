@@ -76,7 +76,7 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
       val label = edge.get.label.asInstanceOf[WindowLabel]
       val now = context.timestamp()
 
-      val bufferedBeforeIterator = beforeStore.fetch(link, now - label.window.toMillis, now)
+      val bufferedBeforeIterator = beforeStore.fetch(link, now - label.window.toMillis, now + label.window.toMillis)
 
       if (!constraintNode.get.hasSuccessors) {
         label.action match {

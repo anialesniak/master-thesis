@@ -1,5 +1,6 @@
 package com.lakesidemutual.customerselfservice.constraints
 
+import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.time.Duration
 import java.util.Properties
 
@@ -49,7 +50,7 @@ class PolicyCreationExpirationMessageConsumer {
     val windowConstraint = new WindowConstraintBuilder[String, InsuranceQuoteEvent]
       .before(((_, e) => e.isInstanceOf[InsuranceQuoteExpiredEvent], "insurance-quote-expired"))
       .after(((_, e) => e.isInstanceOf[PolicyCreatedEvent], "policy-created"))
-      .window(Duration.ofSeconds(1))
+      .window(Duration.ofMillis(2000))
       .dropBefore
 
     val constraint = new ConstraintBuilder[String, InsuranceQuoteEvent, java.lang.Long]
@@ -60,7 +61,7 @@ class PolicyCreationExpirationMessageConsumer {
     val builder = new CStreamsBuilder()
 
     builder
-      .stream("insurance-quote-expired-events")(Consumed.`with`(Serdes.String, insuranceQuoteEventSerde))
+      .stream(Set("insurance-quote-expired-events", "policy-created-events"))(Consumed.`with`(Serdes.String, insuranceQuoteEventSerde))
       .constrain(constraint)
       .foreach((_, event) => handleEvent(event))
 
@@ -73,27 +74,40 @@ class PolicyCreationExpirationMessageConsumer {
   }
 
   private def handleEvent(event: InsuranceQuoteEvent): Unit =  {
-  		logger.info("A new policy creation or expiration event has been received.");
-
-  		val id = event.getInsuranceQuoteRequestId
-  		val insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
-
-  		if(!insuranceQuoteRequestOpt.isPresent) {
-  			logger.error("Unable to process the event with an invalid insurance quote request id.");
-  			return
-  		}
-
-  		val insuranceQuoteRequest = insuranceQuoteRequestOpt.get();
+//  		val id = event.getInsuranceQuoteRequestId
+//  		val insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
+//
+//  		if(!insuranceQuoteRequestOpt.isPresent) {
+//  			logger.error("Unable to process the event with an invalid insurance quote request id.")
+//  			return
+//  		}
+//
+//  		val insuranceQuoteRequest = insuranceQuoteRequestOpt.get()
 
   		event match {
         case insuranceQuoteExpiredEvent: InsuranceQuoteExpiredEvent =>
-          insuranceQuoteRequest.markQuoteAsExpired(insuranceQuoteExpiredEvent.getDate)
-          logger.info("The insurance quote for insurance quote request " + insuranceQuoteRequest.getId + " has expired.");
+          logger.info("A new insurance expiration event has been received.")
+
+          val line = insuranceQuoteExpiredEvent.getInsuranceQuoteRequestId.toString + " " +
+            insuranceQuoteExpiredEvent.getDate.getTime + " " + System.currentTimeMillis() + " InsuranceQuoteExpiredEvent\n"
+
+          Files.write(Paths.get("received-insurance-events-sc2000.txt"), line.getBytes, StandardOpenOption.APPEND)
+
+        //insuranceQuoteRequest.markQuoteAsExpired(insuranceQuoteExpiredEvent.getDate)
+        //logger.info("The insurance quote for insurance quote request " + insuranceQuoteRequest.getId + " has expired.");
+
         case policyCreatedEvent:  PolicyCreatedEvent =>
-          insuranceQuoteRequest.finalizeQuote(policyCreatedEvent.getPolicyId, policyCreatedEvent.getDate)
-          logger.info("The policy for for insurance quote request " + insuranceQuoteRequest.getId + " has been created.");
+          logger.info("A new policy creation event has been received.")
+
+          val line = policyCreatedEvent.getInsuranceQuoteRequestId.toString + " " +
+            policyCreatedEvent.getDate.getTime + " " + System.currentTimeMillis() + " PolicyCreatedEvent\n"
+
+          Files.write(Paths.get("received-insurance-events-sc2000.txt"), line.getBytes, StandardOpenOption.APPEND)
+
+          //insuranceQuoteRequest.finalizeQuote(policyCreatedEvent.getPolicyId, policyCreatedEvent.getDate)
+          //logger.info("The policy for for insurance quote request " + insuranceQuoteRequest.getId + " has been created.");
       }
 
-  		insuranceQuoteRequestRepository.save(insuranceQuoteRequest);
+  		//insuranceQuoteRequestRepository.save(insuranceQuoteRequest);
   	}
 }

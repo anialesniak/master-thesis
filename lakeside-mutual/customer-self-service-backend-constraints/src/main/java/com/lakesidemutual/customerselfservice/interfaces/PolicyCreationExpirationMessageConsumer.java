@@ -9,9 +9,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.groupingBy;
 
 /**
  * PolicyCreationExpirationMessageConsumer is a Spring component that consumes PolicyCreatedEvents
@@ -22,35 +30,73 @@ import java.util.Optional;
 public class PolicyCreationExpirationMessageConsumer {
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
+	List<InsuranceQuoteEvent> queue = new LinkedList<>();
+
 	@Autowired
 	private InsuranceQuoteRequestRepository insuranceQuoteRequestRepository;
 
-	@KafkaListener(topics = "${policyCreationExpirationEvent.topicName}",
+	@KafkaListener(topics = {"${policyCreatedEvent.topicName}", "${insuranceQuoteExpiredEvent.topicName}"},
 			groupId = "${spring.kafka.consumer.group-id}",
 			containerFactory = "policyCreationExpirationListenerFactory")
 	public void receiveEvent(final InsuranceQuoteEvent event) {
-		logger.info("A new policy creation or expiration event has been received.");
-		
-		final Long id = event.getInsuranceQuoteRequestId();
-		final Optional<InsuranceQuoteRequestAggregateRoot> insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
+		queue.add(event);
+	}
 
-		if(!insuranceQuoteRequestOpt.isPresent()) {
-			logger.error("Unable to process the event with an invalid insurance quote request id.");
-			return;
-		}
+	@Scheduled(fixedRate = 1000, initialDelay = 10000)
+	private void filterAndHandleEvents() {
+		logger.info("Insurance events publish initiated with " + this.queue.size() + " elements.");
 
-		final InsuranceQuoteRequestAggregateRoot insuranceQuoteRequest = insuranceQuoteRequestOpt.get();
+		List<InsuranceQuoteEvent> buffered = this.queue;
+		this.queue = new LinkedList<>();
+
+		Map<Long, List<InsuranceQuoteEvent>> eventsPerInsuranceQuote = buffered
+			.stream()
+			.collect(groupingBy(InsuranceQuoteEvent::getInsuranceQuoteRequestId));
+
+		Map<Long, List<InsuranceQuoteEvent>> filteredEventsPerInsuranceQuote = eventsPerInsuranceQuote
+			.entrySet()
+			.stream()
+			.collect(Collectors.toMap(Map.Entry::getKey, e -> filterInsuranceQuoteEvents(e.getValue())));
+
+		filteredEventsPerInsuranceQuote
+			.forEach((k, v) -> v.forEach(this::handleEvent));
+	}
+
+	private void handleEvent(final InsuranceQuoteEvent event) {
 
 		if (event instanceof InsuranceQuoteExpiredEvent) {
 			InsuranceQuoteExpiredEvent insuranceQuoteExpiredEvent = (InsuranceQuoteExpiredEvent) event;
-			insuranceQuoteRequest.markQuoteAsExpired(insuranceQuoteExpiredEvent.getDate());
-			logger.info("The insurance quote for insurance quote request " + insuranceQuoteRequest.getId() + " has expired.");
+
+			String line = event.getInsuranceQuoteRequestId().toString() + " " +
+					insuranceQuoteExpiredEvent.getDate().getTime() + " "
+					+ System.currentTimeMillis() + " InsuranceQuoteExpiredEvent\n";
+			try {
+				Files.write(Paths.get("received-insurance-events.txt"), line.getBytes(), StandardOpenOption.APPEND);
+			} catch (IOException e) {}
+
+			//insuranceQuoteRequest.markQuoteAsExpired(insuranceQuoteExpiredEvent.getDate());
+			//logger.info("The insurance quote for insurance quote request " + insuranceQuoteExpiredEvent.getInsuranceQuoteRequestId() + " has expired.");
 		} else if (event instanceof PolicyCreatedEvent) {
 			PolicyCreatedEvent policyCreatedEvent = (PolicyCreatedEvent) event;
-			insuranceQuoteRequest.finalizeQuote(policyCreatedEvent.getPolicyId(), policyCreatedEvent.getDate());
-			logger.info("The policy for for insurance quote request " + insuranceQuoteRequest.getId() + " has been created.");
+
+			String line = event.getInsuranceQuoteRequestId().toString() + " " +
+					policyCreatedEvent.getDate().getTime() + " "
+					+ System.currentTimeMillis() + " PolicyCreatedEvent\n";
+			try {
+				Files.write(Paths.get("received-insurance-events.txt"), line.getBytes(), StandardOpenOption.APPEND);
+			} catch (IOException e) {}
+
+			//insuranceQuoteRequest.finalizeQuote(policyCreatedEvent.getPolicyId(), policyCreatedEvent.getDate());
+			//logger.info("The policy for for insurance quote request " + policyCreatedEvent.getInsuranceQuoteRequestId() + " has been created.");
 		}
 
-		insuranceQuoteRequestRepository.save(insuranceQuoteRequest);
+		//insuranceQuoteRequestRepository.save(insuranceQuoteRequest);
+	}
+
+	private List<InsuranceQuoteEvent> filterInsuranceQuoteEvents(List<InsuranceQuoteEvent> events) {
+		if (events.size() > 1 && events.get(0) instanceof InsuranceQuoteExpiredEvent) {
+			return events.subList(1, 2);
+		}
+		return events;
 	}
 }

@@ -4,6 +4,7 @@ require('log-timestamp')(() => {
   })
   return `[${timestamp}] %s`
 })
+const fs = require('fs')
 const nconf = require('nconf')
 const path = require('path')
 const grpc = require('grpc')
@@ -29,9 +30,11 @@ The handleMessage() function gets called whenever a new PolicyEvent message is a
 on the message topic. Each message is then persisted with the data manager.
 */
 function handleMessage(dataManager, message) {
-  const event = JSON.parse(message)
-  console.log('An event has been consumed:')
-  console.log(JSON.stringify(event, null, 4))
+  const event = JSON.parse(message.value)
+
+  const line = `${event.originator} ${event.date} ${new Date().getTime()} ${message.key} ${event.kind} \n`
+  fs.appendFile('data/received-events.txt', line, function (err) {})
+
   dataManager.addEvent(event)
   dataManager
     .save()
@@ -51,7 +54,7 @@ function consumeEvents(dataManager) {
 
     await consumer.run({
       eachMessage: async ({ topic, partition, message }) => {
-        handleMessage(dataManager, message.value)
+        handleMessage(dataManager, message)
       },
     })
   }

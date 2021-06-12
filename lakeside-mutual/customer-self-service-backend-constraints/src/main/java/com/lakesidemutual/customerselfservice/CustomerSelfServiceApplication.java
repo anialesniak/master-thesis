@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * CustomerSelfServiceApplication is the execution entry point of the Customer Self-Service backend which
@@ -13,6 +14,7 @@ import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
  */
 @SpringBootApplication
 @EnableCircuitBreaker
+@EnableScheduling
 public class CustomerSelfServiceApplication implements BoundedContext {
 	private static Logger logger = LoggerFactory.getLogger(CustomerSelfServiceApplication.class);
 

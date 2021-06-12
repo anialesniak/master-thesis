@@ -9,7 +9,9 @@ import com.github.annterina.stream_constraints.constraints.window.WindowConstrai
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.scala.kstream.{Consumed, Produced}
-import org.apache.kafka.streams.{KafkaStreams, StreamsConfig, Topology}
+import org.apache.kafka.streams.state.QueryableStoreTypes.keyValueStore
+import org.apache.kafka.streams.state.{KeyValueStore, QueryableStoreTypes, ReadOnlyKeyValueStore, ValueAndTimestamp}
+import org.apache.kafka.streams.{KafkaStreams, KeyValue, StreamsConfig, Topology}
 
 object PolicyEventsConstraints extends App {
 
@@ -35,6 +37,7 @@ object PolicyEventsConstraints extends App {
       ((_, e) => e.`type` == "DeletePolicyEvent", "policy-deleted"))
     .windowConstraint(windowConstraint)
     .terminal(((_, e) => e.`type` == "DeletePolicyEvent", "policy-deleted"))
+    .redirect("policy-events-redirect")
     .link((_, e) => e.policyId)(Serdes.String)
     .build(Serdes.String, policyEventSerde)
 
@@ -53,6 +56,36 @@ object PolicyEventsConstraints extends App {
   streams.start()
 
   sys.ShutdownHookThread {
+    val keyValueStore = streams.store("Graph", QueryableStoreTypes.keyValueStore())
+    val it = keyValueStore.all()
+    var i = 0
+    while (it.hasNext) {
+      val next = it.next
+      i = i + 1
+    }
+    print(s"TOTAL GRAPH KEYS: $i \n" )
+    it.close()
+
+    val deletedKeyValueStore = streams.store("policy-deleted", QueryableStoreTypes.keyValueStore())
+    val itDeleted = deletedKeyValueStore.all()
+    var j = 0
+    while (itDeleted.hasNext) {
+      val next = itDeleted.next
+      j = j + 1
+    }
+    print(s"TOTAL DELETED KEYS: $j \n" )
+    itDeleted.close()
+
+    val deletedWindowStore = streams.store("policy-deleted-window", QueryableStoreTypes.windowStore())
+    val itDeletedWindow = deletedWindowStore.all()
+    var k = 0
+    while (itDeletedWindow.hasNext) {
+      val next = itDeletedWindow.next
+      k = k + 1
+    }
+    print(s"TOTAL DELETED WINDOW KEYS: $k \n" )
+    itDeletedWindow.close()
+
     streams.close(Duration.ofSeconds(5))
   }
 }

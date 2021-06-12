@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory
 /**
  * Produces a stream on Kafka
  * Two possible configurations:
- * - periodic-burst: publishes a load of messages each minute
- * - constant-rate: publishes a constant rate of messages (each 100ms)
+ * - policy
+ * - insurance
  */
 object StreamProducer extends App {
   val logger = LoggerFactory.getLogger(getClass)
@@ -18,8 +18,10 @@ object StreamProducer extends App {
   kafkaProperties.setProperty("policy.topic", ConfigUtils.policyTopic)
 
   val publisher: Publisher = {
-    if (ConfigUtils.mode == "constant-rate") {
-      new ConstantRatePublisher(kafkaProperties)
+    if (ConfigUtils.mode == "policy") {
+      new PolicyPublisher(kafkaProperties)
+    } else if (ConfigUtils.mode == "insurance") {
+      new InsuranceQuotePublisher(kafkaProperties)
     } else {
       throw new RuntimeException(s"Unsupported app mode ${ConfigUtils.mode}.")
     }
