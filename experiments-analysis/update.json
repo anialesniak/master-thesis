@@ -1,0 +1,56 @@
+{
+  "kind": "UpdatePolicyEvent",
+  "originator": "PolicyManagementBackend",
+  "date": 1618948284615,
+  "customer": {
+    "customerId": "rgpp0wkpec",
+    "firstname": "Max",
+    "lastname": "Mustermann",
+    "birthday": 631148400000,
+    "streetAddress": "Oberseestrasse 10",
+    "postalCode": "8640",
+    "city": "Rapperswil",
+    "email": "admin@example.com",
+    "phoneNumber": "055 222 4111",
+    "moveHistory": [],
+    "links": [
+      {
+        "rel": "self",
+        "href": "http://localhost:8110/customers/rgpp0wkpec?fields="
+      },
+      {
+        "rel": "address.change",
+        "href": "http://localhost:8110/customers/rgpp0wkpec/address"
+      }
+    ]
+  },
+  "policy": {
+    "policyId": "xmhswhgleo",
+    "customer": "rgpp0wkpec",
+    "creationDate": 1618948272375,
+    "policyPeriod": {
+      "startDate": 1618956000000,
+      "endDate": 1619215200000
+    },
+    "policyType": "Life Insurance",
+    "deductible": {
+      "amount": 100,
+      "currency": "CHF"
+    },
+    "policyLimit": {
+      "amount": 100000,
+      "currency": "CHF"
+    },
+    "insurancePremium": {
+      "amount": 1000,
+      "currency": "CHF"
+    },
+    "insuringAgreement": {
+      "agreementItems": []
+    },
+    "links": [],
+    "_expandable": [
+      "customer"
+    ]
+  }
+}
