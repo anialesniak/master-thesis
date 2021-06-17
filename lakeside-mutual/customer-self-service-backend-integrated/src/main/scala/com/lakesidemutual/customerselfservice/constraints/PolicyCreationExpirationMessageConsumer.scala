@@ -49,11 +49,12 @@ class PolicyCreationExpirationMessageConsumer {
     val windowConstraint = new WindowConstraintBuilder[String, InsuranceQuoteEvent]
       .before(((_, e) => e.isInstanceOf[InsuranceQuoteExpiredEvent], "insurance-quote-expired"))
       .after(((_, e) => e.isInstanceOf[PolicyCreatedEvent], "policy-created"))
-      .window(Duration.ofSeconds(5))
+      .window(Duration.ofSeconds(10))
       .dropBefore
 
     val constraint = new ConstraintBuilder[String, InsuranceQuoteEvent, java.lang.Long]
       .windowConstraint(windowConstraint)
+      .redirect("discarded-expiration-events")
       .link((_, e) => e.getInsuranceQuoteRequestId)(Serdes.Long)
       .build(Serdes.String, insuranceQuoteEventSerde)
 

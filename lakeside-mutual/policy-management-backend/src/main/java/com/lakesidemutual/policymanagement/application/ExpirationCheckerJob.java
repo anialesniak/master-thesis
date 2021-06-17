@@ -2,12 +2,10 @@ package com.lakesidemutual.policymanagement.application;
 
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
-import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +46,7 @@ public class ExpirationCheckerJob implements Job {
 		if (expiredQuoteRequests.size() > 0) {
 			logger.info("Found {} expired insurance quotes", expiredQuoteRequests.size());
 		} else {
-			logger.info("Found no expired insurance quotes");
+			logger.debug("Found no expired insurance quotes");
 		}
 	}
 }
