@@ -30,7 +30,7 @@ class PolicyCreationExpirationMessageConsumer {
     InsuranceQuoteEventSerde.deserializer())
 
   @Autowired
-  var insuranceQuoteRequestRepository: InsuranceQuoteRequestRepository = null
+  var insuranceQuoteRequestRepository: InsuranceQuoteRequestRepository = _
 
   @Bean
   def kafkaStreams(): KafkaStreams = {
@@ -76,7 +76,7 @@ class PolicyCreationExpirationMessageConsumer {
   private def handleEvent(event: InsuranceQuoteEvent): Unit =  {
 
     val id = event.getInsuranceQuoteRequestId
-    val insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
+    val insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id)
 
     if(!insuranceQuoteRequestOpt.isPresent) {
       logger.error("Unable to process the event with an invalid insurance quote request id.")
@@ -99,6 +99,6 @@ class PolicyCreationExpirationMessageConsumer {
         logger.info("The policy for for insurance quote request " + policyCreatedEvent.getInsuranceQuoteRequestId + " has been created.");
     }
 
-    insuranceQuoteRequestRepository.save(insuranceQuoteRequest);
+    insuranceQuoteRequestRepository.save(insuranceQuoteRequest)
   }
 }
