@@ -88,6 +88,7 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
             currentToPublish = Some(KeyValue.pair(key, value))
           case DropAfter =>
             publishBufferedBefore(bufferedBeforeIterator, beforeStore, link, allBeforeToPublish)
+            context.forward(Redirect(key, redirect = true), value)
         }
       } else {
         val storeName = constraintNode.get.value.name ++ "-window"
@@ -113,6 +114,7 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
               recordList.addAll(entry.value)
               store.put(link, recordList.toList, entry.key)
             }
+            context.forward(Redirect(key, redirect = true), value)
         }
       }
 
@@ -153,6 +155,7 @@ class WindowConstraintTransformer[K, V, L](constraint: Constraint[K, V, L], grap
                                  link: L): Unit = {
     while (!constraint.withFullWindows && iterator.hasNext) {
       val entry = iterator.next
+      entry.value.foreach(keyValue => context.forward(Redirect(keyValue.key, redirect = true), keyValue.value))
       store.put(link, null, entry.key)
     }
   }
