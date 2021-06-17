@@ -19,8 +19,8 @@ import org.springframework.scheduling.quartz.SpringBeanJobFactory;
  * */
 @Configuration
 public class ExpirationCheckerJobConfiguration {
-	private final static int START_DELAY = 60000;
-	private final static int REPEAT_INTERVAL = 60000;
+	private final static int START_DELAY = 10000;
+	private final static int REPEAT_INTERVAL = 1000;
 
 	@Autowired
 	private ApplicationContext applicationContext;

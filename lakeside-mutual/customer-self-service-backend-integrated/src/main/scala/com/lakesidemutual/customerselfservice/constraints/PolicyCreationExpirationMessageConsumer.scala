@@ -1,6 +1,5 @@
 package com.lakesidemutual.customerselfservice.constraints
 
-import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.time.Duration
 import java.util.Properties
 
@@ -50,7 +49,7 @@ class PolicyCreationExpirationMessageConsumer {
     val windowConstraint = new WindowConstraintBuilder[String, InsuranceQuoteEvent]
       .before(((_, e) => e.isInstanceOf[InsuranceQuoteExpiredEvent], "insurance-quote-expired"))
       .after(((_, e) => e.isInstanceOf[PolicyCreatedEvent], "policy-created"))
-      .window(Duration.ofMillis(2000))
+      .window(Duration.ofSeconds(5))
       .dropBefore
 
     val constraint = new ConstraintBuilder[String, InsuranceQuoteEvent, java.lang.Long]
@@ -74,40 +73,31 @@ class PolicyCreationExpirationMessageConsumer {
   }
 
   private def handleEvent(event: InsuranceQuoteEvent): Unit =  {
-//  		val id = event.getInsuranceQuoteRequestId
-//  		val insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
-//
-//  		if(!insuranceQuoteRequestOpt.isPresent) {
-//  			logger.error("Unable to process the event with an invalid insurance quote request id.")
-//  			return
-//  		}
-//
-//  		val insuranceQuoteRequest = insuranceQuoteRequestOpt.get()
 
-  		event match {
-        case insuranceQuoteExpiredEvent: InsuranceQuoteExpiredEvent =>
-          logger.info("A new insurance expiration event has been received.")
+    val id = event.getInsuranceQuoteRequestId
+    val insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
 
-          val line = insuranceQuoteExpiredEvent.getInsuranceQuoteRequestId.toString + " " +
-            insuranceQuoteExpiredEvent.getDate.getTime + " " + System.currentTimeMillis() + " InsuranceQuoteExpiredEvent\n"
+    if(!insuranceQuoteRequestOpt.isPresent) {
+      logger.error("Unable to process the event with an invalid insurance quote request id.")
+      return
+    }
 
-          Files.write(Paths.get("received-insurance-events-sc2000.txt"), line.getBytes, StandardOpenOption.APPEND)
+    val insuranceQuoteRequest = insuranceQuoteRequestOpt.get()
 
-        //insuranceQuoteRequest.markQuoteAsExpired(insuranceQuoteExpiredEvent.getDate)
-        //logger.info("The insurance quote for insurance quote request " + insuranceQuoteRequest.getId + " has expired.");
+    event match {
+      case insuranceQuoteExpiredEvent: InsuranceQuoteExpiredEvent =>
+        logger.info("A new insurance expiration event has been received.")
 
-        case policyCreatedEvent:  PolicyCreatedEvent =>
-          logger.info("A new policy creation event has been received.")
+        insuranceQuoteRequest.markQuoteAsExpired(insuranceQuoteExpiredEvent.getDate)
+        logger.info("The insurance quote for insurance quote request " + insuranceQuoteExpiredEvent.getInsuranceQuoteRequestId + " has expired.");
 
-          val line = policyCreatedEvent.getInsuranceQuoteRequestId.toString + " " +
-            policyCreatedEvent.getDate.getTime + " " + System.currentTimeMillis() + " PolicyCreatedEvent\n"
+      case policyCreatedEvent:  PolicyCreatedEvent =>
+        logger.info("A new policy creation event has been received.")
 
-          Files.write(Paths.get("received-insurance-events-sc2000.txt"), line.getBytes, StandardOpenOption.APPEND)
+        insuranceQuoteRequest.finalizeQuote(policyCreatedEvent.getPolicyId, policyCreatedEvent.getDate)
+        logger.info("The policy for for insurance quote request " + policyCreatedEvent.getInsuranceQuoteRequestId + " has been created.");
+    }
 
-          //insuranceQuoteRequest.finalizeQuote(policyCreatedEvent.getPolicyId, policyCreatedEvent.getDate)
-          //logger.info("The policy for for insurance quote request " + insuranceQuoteRequest.getId + " has been created.");
-      }
-
-  		//insuranceQuoteRequestRepository.save(insuranceQuoteRequest);
-  	}
+    insuranceQuoteRequestRepository.save(insuranceQuoteRequest);
+  }
 }

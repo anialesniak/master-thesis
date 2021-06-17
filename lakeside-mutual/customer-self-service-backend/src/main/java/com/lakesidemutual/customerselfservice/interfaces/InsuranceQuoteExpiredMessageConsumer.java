@@ -14,7 +14,7 @@ import com.lakesidemutual.customerselfservice.infrastructure.InsuranceQuoteReque
 
 /**
  * InsuranceQuoteExpiredMessageConsumer is a Spring component that consumes InsuranceQuoteExpiredEvents
- * as they arrive through the ActiveMQ message queue. It processes these events by marking the corresponding
+ * as they arrive through the Kafka message topic. It processes these events by marking the corresponding
  * insurance quote requests as expired.
  * */
 @Component
@@ -33,7 +33,7 @@ public class InsuranceQuoteExpiredMessageConsumer {
 		final Long id = insuranceQuoteExpiredEvent.getInsuranceQuoteRequestId();
 		final Optional<InsuranceQuoteRequestAggregateRoot> insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
 
-		if(!insuranceQuoteRequestOpt.isPresent()) {
+		if (!insuranceQuoteRequestOpt.isPresent()) {
 			logger.error("Unable to process an insurance quote expired event with an invalid insurance quote request id.");
 			return;
 		}

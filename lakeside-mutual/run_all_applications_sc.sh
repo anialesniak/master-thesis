@@ -29,11 +29,11 @@ bgRed.bold" \
   \
   "cd eureka-server && mvn spring-boot:run" \
   "cd customer-core && mvn spring-boot:run" \
-  "cd customer-self-service-backend && mvn spring-boot:run" \
+  "cd customer-self-service-backend-integrated && mvn spring-boot:run" \
   "cd customer-self-service-frontend && npm start"\
   "cd customer-management-backend && mvn spring-boot:run" \
   "cd customer-management-frontend && npm start"\
   "cd policy-management-backend && mvn spring-boot:run" \
   "cd policy-management-frontend && npm start"\
-  "cd risk-management-server-baseline && npm start"\
+  "cd risk-management-server && npm start"\
   "cd spring-boot-admin && mvn spring-boot:run" 

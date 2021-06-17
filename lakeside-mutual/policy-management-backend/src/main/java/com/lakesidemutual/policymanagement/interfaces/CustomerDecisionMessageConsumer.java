@@ -95,7 +95,7 @@ public class CustomerDecisionMessageConsumer {
 				customerSelfServiceMessageProducer.sendInsuranceQuoteExpiredEvent(event);
 			} else {
 
-				TimeUnit.SECONDS.sleep(20);
+				TimeUnit.SECONDS.sleep(10);
 
 				logger.info("The insurance quote for request {} has been accepted", insuranceQuoteRequest.getId());
 				insuranceQuoteRequest.acceptQuote(decisionDate);

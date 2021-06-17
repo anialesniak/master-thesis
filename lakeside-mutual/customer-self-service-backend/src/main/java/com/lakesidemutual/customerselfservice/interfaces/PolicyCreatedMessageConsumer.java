@@ -14,7 +14,7 @@ import com.lakesidemutual.customerselfservice.infrastructure.InsuranceQuoteReque
 
 /**
  * PolicyCreatedMessageConsumer is a Spring component that consumes PolicyCreatedEvents
- * as they arrive through the ActiveMQ message queue. It processes these events by updating
+ * as they arrive through the Kafka message topic. It processes these events by updating
  * the status of the corresponding insurance quote requests.
  * */
 @Component
@@ -33,14 +33,14 @@ public class PolicyCreatedMessageConsumer {
 		final Long id = policyCreatedEvent.getInsuranceQuoteRequestId();
 		final Optional<InsuranceQuoteRequestAggregateRoot> insuranceQuoteRequestOpt = insuranceQuoteRequestRepository.findById(id);
 
-		if(!insuranceQuoteRequestOpt.isPresent()) {
+		if (!insuranceQuoteRequestOpt.isPresent()) {
 			logger.error("Unable to process a policy created event with an invalid insurance quote request id.");
 			return;
 		}
 
 		final InsuranceQuoteRequestAggregateRoot insuranceQuoteRequest = insuranceQuoteRequestOpt.get();
 		insuranceQuoteRequest.finalizeQuote(policyCreatedEvent.getPolicyId(), policyCreatedEvent.getDate());
-		logger.info("The insurance quote for insurance quote request " + insuranceQuoteRequest.getId() + " has expired.");
+		logger.info("A policy was created for the insurance quote request " + insuranceQuoteRequest.getId() + ".");
 		insuranceQuoteRequestRepository.save(insuranceQuoteRequest);
 	}
 }

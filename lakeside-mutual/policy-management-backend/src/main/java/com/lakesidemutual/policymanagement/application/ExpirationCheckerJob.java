@@ -2,6 +2,7 @@ package com.lakesidemutual.policymanagement.application;
 
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.quartz.Job;
@@ -30,7 +31,7 @@ public class ExpirationCheckerJob implements Job {
 	private InsuranceQuoteRequestRepository insuranceQuoteRequestRepository;
 
 	@Override
-	public void execute(JobExecutionContext context) throws JobExecutionException {
+	public void execute(JobExecutionContext context) {
 		logger.debug("Checking for expired insurance quotes...");
 
 		final Date date = new Date();
@@ -44,10 +45,10 @@ public class ExpirationCheckerJob implements Job {
 			customerSelfServiceMessageProducer.sendInsuranceQuoteExpiredEvent(event);
 		});
 
-		if(expiredQuoteRequests.size() > 0) {
+		if (expiredQuoteRequests.size() > 0) {
 			logger.info("Found {} expired insurance quotes", expiredQuoteRequests.size());
 		} else {
-			logger.debug("Found no expired insurance quotes");
+			logger.info("Found no expired insurance quotes");
 		}
 	}
 }

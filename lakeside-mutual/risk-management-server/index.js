@@ -31,10 +31,6 @@ on the message topic. Each message is then persisted with the data manager.
 */
 function handleMessage(dataManager, message) {
   const event = JSON.parse(message.value)
-
-  const line = `${event.originator} ${event.date} ${new Date().getTime()} ${message.key} ${event.kind} \n`
-  fs.appendFile('data/received-events.txt', line, function (err) {})
-
   dataManager.addEvent(event)
   dataManager
     .save()
@@ -50,7 +46,7 @@ they become available. Each event is then persisted with the data manager.
 function consumeEvents(dataManager) {
   const run = async () => {
     await consumer.connect()
-    await consumer.subscribe({ topic: 'policy-events-constrained', fromBeginning: false })
+    await consumer.subscribe({ topic: 'policy-events', fromBeginning: false })
 
     await consumer.run({
       eachMessage: async ({ topic, partition, message }) => {
